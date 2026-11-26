@@ -105,3 +105,35 @@ def test_stream_summary_raises_if_no_done(monkeypatch):
     _patch_lines(monkeypatch, [json.dumps({"message": {"content": "Hi"}}).encode()])
     with pytest.raises(RuntimeError):
         list(stream_summary("t", "en"))
+
+
+def test_detailed_prompt_rules():
+    system = build_messages("t", "zh", detailed=True)[0]["content"]
+    assert "Simplified Chinese" in system and "**Takeaways**" in system
+    assert "order" in system and "names" in system and "numbers" in system
+    assert "no lines starting with #" in system
+
+
+def test_default_prompt_unchanged():
+    system = build_messages("t", "en")[0]["content"]
+    assert "**Key points**" in system and "**Takeaways**" not in system
+
+
+def test_stream_summary_detailed_uses_detailed_prompt(monkeypatch):
+    captured = {}
+
+    class FakeResp:
+        def __enter__(self): return self
+        def __exit__(self, *a): pass
+        def raise_for_status(self): pass
+        def iter_lines(self):
+            yield json.dumps({"message": {"content": "x"}, "done": True}).encode()
+
+    def fake_post(url, json=None, stream=None, timeout=None):
+        captured["json"] = json
+        return FakeResp()
+
+    import requests
+    monkeypatch.setattr(requests, "post", fake_post)
+    assert list(stream_summary("t", "en", detailed=True)) == ["x"]
+    assert "**Takeaways**" in captured["json"]["messages"][0]["content"]

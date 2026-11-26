@@ -29,6 +29,7 @@ class Note:
     fields: dict
     summary: str
     transcript: str
+    detailed: str = ""
 
 
 def note_filename(title: str, video_id: str) -> str:
@@ -111,7 +112,8 @@ def parse_note(path: Path) -> Note:
     if fields is None:
         raise ValueError(f"invalid frontmatter: {path}")
     sections = split_sections(parts[1])
-    return Note(Path(path), fields, sections.get("Summary", ""), sections.get("Transcript", ""))
+    return Note(Path(path), fields, sections.get("Summary", ""), sections.get("Transcript", ""),
+                sections.get("Detailed summary", ""))
 
 
 def find_note(vault: Path, source: str, video_id: str) -> Path | None:

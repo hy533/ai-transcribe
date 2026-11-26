@@ -1,6 +1,6 @@
 import pytest
 
-from notes import VideoMeta, find_note, note_filename, parse_note, write_new_note
+from notes import VideoMeta, find_note, note_filename, parse_note, replace_section, write_new_note
 
 HOSTILE = 'He said: "Don\'t #panic" — 测试 🎉 [part 1]'
 
@@ -73,3 +73,14 @@ def test_podcast_note_tag(tmp_path):
 def test_video_note_tag_unchanged(tmp_path):
     p = write_new_note(tmp_path, meta(), "en", "captions", "[00:00] hi")
     assert parse_note(p).fields["tags"] == ["video"]
+
+
+def test_parse_note_without_detailed_section(tmp_path):
+    p = write_new_note(tmp_path, meta(), "en", "captions", "[00:00] hi")
+    assert parse_note(p).detailed == ""
+
+
+def test_parse_note_reads_detailed_section(tmp_path):
+    p = write_new_note(tmp_path, meta(), "en", "captions", "[00:00] hi")
+    replace_section(p, "Detailed summary", "**Part one**\nstuff")
+    assert parse_note(p).detailed == "**Part one**\nstuff"
