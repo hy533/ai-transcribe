@@ -6,7 +6,7 @@ import requests
 from yt_dlp.utils import DownloadError
 
 from notes import parse_note, set_field, set_status
-from pipeline import Deps, PipelineError, ensure_summary, ensure_transcript, needs_summary
+from pipeline import Deps, PipelineError, ensure_detailed_summary, ensure_summary, ensure_transcript, needs_summary
 from transcript import Segment
 
 VTT = "WEBVTT\n\n00:00:00.000 --> 00:00:02.000\nhello world\n"
@@ -30,6 +30,7 @@ class Fake:
         self.stream_exc = stream_exc
         self.calls = {"captions": 0, "audio": 0, "transcribe": 0, "stream": 0}
         self.audio_paths = []
+        self.detailed_flags = []
 
     def deps(self):
         def get_info(url):
@@ -58,8 +59,9 @@ class Fake:
                 raise self.transcribe_exc
             return self.whisper_result
 
-        def stream(text, language):
+        def stream(text, language, detailed=False):
             self.calls["stream"] += 1
+            self.detailed_flags.append(detailed)
             yield from self.chunks
             if self.stream_exc:
                 raise self.stream_exc
@@ -256,3 +258,73 @@ def test_whisper_step_carries_duration(tmp_path):
     ensure_transcript("https://www.youtube.com/watch?v=abc", tmp_path, f.deps(),
                       lambda step, duration=None: calls.append((step, duration)))
     assert ("whisper", 1916) in calls
+
+
+def _note_with_summary(tmp_path):
+    path, _, _ = run(tmp_path, Fake())
+    ensure_summary(path, Fake().deps(), lambda c: None)
+    return path
+
+
+def test_detailed_summary_written_between_summary_and_transcript(tmp_path):
+    path = _note_with_summary(tmp_path)
+    before = parse_note(path).summary
+    f = Fake(chunks=("**Part**\n", "body"))
+    ensure_detailed_summary(path, f.deps(), lambda c: None)
+    body = path.read_text()
+    assert body.index("## Summary") < body.index("## Detailed summary") < body.index("## Transcript")
+    n = parse_note(path)
+    assert n.detailed == "**Part**\nbody" and n.summary == before
+    assert f.detailed_flags == [True]
+
+
+def test_detailed_keeps_user_sections(tmp_path):
+    path = _note_with_summary(tmp_path)
+    path.write_text(path.read_text() + "\n## My notes\nmine\n")
+    ensure_detailed_summary(path, Fake(chunks=("x",)).deps(), lambda c: None)
+    assert "## My notes\nmine" in path.read_text()
+
+
+def test_detailed_failure_leaves_note_unchanged(tmp_path):
+    path = _note_with_summary(tmp_path)
+    before = path.read_bytes()
+    with pytest.raises(PipelineError):
+        ensure_detailed_summary(path, Fake(chunks=("partial",), stream_exc=RuntimeError("boom")).deps(), lambda c: None)
+    assert path.read_bytes() == before
+
+
+def test_detailed_empty_result_errors(tmp_path):
+    path = _note_with_summary(tmp_path)
+    with pytest.raises(PipelineError, match="empty summary"):
+        ensure_detailed_summary(path, Fake(chunks=("<think>x</think>", "  ")).deps(), lambda c: None)
+    assert "## Detailed summary" not in path.read_text()
+
+
+def test_detailed_ollama_down(tmp_path):
+    path = _note_with_summary(tmp_path)
+    with pytest.raises(PipelineError, match="Ollama isn't running — start it, then Regenerate."):
+        ensure_detailed_summary(path, Fake(stream_exc=requests.ConnectionError()).deps(), lambda c: None)
+
+
+def test_detailed_headings_demoted(tmp_path):
+    path = _note_with_summary(tmp_path)
+    ensure_detailed_summary(path, Fake(chunks=("# Big\ntext",)).deps(), lambda c: None)
+    assert parse_note(path).detailed == "**Big**\ntext"
+
+
+def test_needs_summary_ignores_detailed(tmp_path):
+    path = _note_with_summary(tmp_path)
+    assert not needs_summary(path)
+
+
+def test_reprocess_clears_detailed(tmp_path):
+    path = _note_with_summary(tmp_path)
+    ensure_detailed_summary(path, Fake(chunks=("x",)).deps(), lambda c: None)
+    run(tmp_path, Fake(), force=True)
+    assert parse_note(path).detailed == ""
+
+
+def test_reprocess_without_detailed_adds_no_section(tmp_path):
+    path = _note_with_summary(tmp_path)
+    run(tmp_path, Fake(), force=True)
+    assert "## Detailed summary" not in path.read_text()

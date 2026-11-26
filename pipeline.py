@@ -20,7 +20,7 @@ from fetch import PipelineError, build_meta
 from notes import find_note, note_filename, parse_note, replace_section, set_field, write_new_note
 from transcript import normalize_language, plain_text, render_transcript
 
-__all__ = ["Deps", "PipelineError", "ensure_transcript", "ensure_summary", "needs_summary"]
+__all__ = ["Deps", "PipelineError", "ensure_transcript", "ensure_summary", "ensure_detailed_summary", "needs_summary"]
 
 
 @dataclass
@@ -91,6 +91,8 @@ def ensure_transcript(url: str, vault: Path, deps: Deps, on_step: Callable[..., 
     if existing:
         replace_section(existing, "Transcript", transcript_md)
         replace_section(existing, "Summary", "")
+        if "\n## Detailed summary" in existing.read_text(encoding="utf-8"):
+            replace_section(existing, "Detailed summary", "")
         set_field(existing, "language", language)
         set_field(existing, "transcript_source", source)
         set_field(existing, "processed", date.today().isoformat())
@@ -109,14 +111,16 @@ def needs_summary(path: Path) -> bool:
     return not parse_note(path).summary.strip()
 
 
-def ensure_summary(path: Path, deps: Deps, on_chunk: Callable[[str], None]) -> str:
+def _generate(path: Path, deps: Deps, on_chunk: Callable[[str], None], detailed: bool) -> str:
     note = parse_note(path)
     text = plain_text(note.transcript)
     if not summarize.fits_context(text):
         raise PipelineError("summary", "Transcript is too long for the model's context window (64k tokens). The transcript is saved.")
+    language = str(note.fields.get("language") or "")
+    stream = deps.stream_summary(text, language, detailed=True) if detailed else deps.stream_summary(text, language)
     chunks = []
     try:
-        for chunk in deps.stream_summary(text, str(note.fields.get("language") or "")):
+        for chunk in stream:
             chunks.append(chunk)
             on_chunk(chunk)
     except requests.ConnectionError as e:
@@ -124,6 +128,19 @@ def ensure_summary(path: Path, deps: Deps, on_chunk: Callable[[str], None]) -> s
     except Exception as e:
         raise PipelineError("summary", str(e)) from e
     summary = summarize.strip_think("".join(chunks)).strip()
-    summary = re.sub(r"^#+[ \t]*(.*?)[ \t]*$", r"**\1**", summary, flags=re.MULTILINE)
+    return re.sub(r"^#+[ \t]*(.*?)[ \t]*$", r"**\1**", summary, flags=re.MULTILINE)
+
+
+def ensure_summary(path: Path, deps: Deps, on_chunk: Callable[[str], None]) -> str:
+    summary = _generate(path, deps, on_chunk, detailed=False)
     replace_section(path, "Summary", summary)
     return summary
+
+
+def ensure_detailed_summary(path: Path, deps: Deps, on_chunk: Callable[[str], None]) -> str:
+    """On demand only: writes '## Detailed summary' after the stream completes; never touches the short summary."""
+    detailed = _generate(path, deps, on_chunk, detailed=True)
+    if not detailed:
+        raise PipelineError("summary", "The model returned an empty summary — try again.")
+    replace_section(path, "Detailed summary", detailed)
+    return detailed
