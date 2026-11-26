@@ -23,7 +23,7 @@ def process_link(url: str, force: bool = False):
         def on_step(step: str) -> None:
             if step == "saved":
                 return
-            st.write(STEP_LINES[step])
+            st.write(STEP_LINES.get(step, step))
         try:
             path, existed = ensure_transcript(url, config.VAULT_DIR, Deps.real(), on_step, force=force)
         except PipelineError as e:
@@ -47,11 +47,17 @@ def render_sidebar() -> None:
             st.rerun()
 
 
+def reset_note_state(path: Path) -> None:
+    st.session_state.setdefault("summary_error", {}).pop(str(path), None)
+
+
 @st.dialog("Reprocess video")
 def reprocess_dialog(url: str) -> None:
     st.write("Replaces transcript and summary; keeps your status and notes.")
-    if st.button("Reprocess", type="primary"):
-        if process_link(url, force=True):
+    if st.button("Reprocess", type="primary", key="reprocess-confirm"):
+        result = process_link(url, force=True)
+        if result:
+            reset_note_state(result[0])
             st.rerun()
 
 
@@ -60,11 +66,15 @@ def render_header(path: Path, note) -> None:
     left, right = st.columns([12, 1])
     left.markdown(f"### [{fields.get('title')}]({fields.get('url')})")
     with right.popover("⋯"):
-        if st.button("Regenerate summary"):
-            st.session_state.get("summary_error", {}).pop(str(path), None)
-            replace_section(path, "Summary", "")
-            st.rerun()
-        if st.button("Reprocess video"):
+        if st.button("Regenerate summary", key="regenerate"):
+            try:
+                replace_section(path, "Summary", "")
+            except (OSError, ValueError) as e:
+                st.error(f"Couldn't clear the summary: {e}")
+            else:
+                reset_note_state(path)
+                st.rerun()
+        if st.button("Reprocess video", key="reprocess"):
             reprocess_dialog(str(fields.get("url")))
     source = SOURCE_NAMES.get(str(fields.get("source")), str(fields.get("source")))
     st.caption(" · ".join(str(x) for x in (
@@ -88,6 +98,10 @@ def render_header(path: Path, note) -> None:
 def render_columns(path: Path, note) -> None:
     summary_col, transcript_col = st.columns([2, 3])
     errors = st.session_state.setdefault("summary_error", {})
+    with transcript_col:
+        st.subheader("Transcript")
+        with st.container(height=650):
+            st.markdown(note.transcript)
     with summary_col:
         st.subheader("Summary")
         if str(path) in errors:
@@ -105,13 +119,12 @@ def render_columns(path: Path, note) -> None:
                 ensure_summary(path, Deps.real(), on_chunk)
             except PipelineError as e:
                 errors[str(path)] = f"{e.step}: {e.message}"
+            else:
+                if needs_summary(path):
+                    errors[str(path)] = "summary: The model returned an empty summary — use ⋯ → Regenerate."
             st.rerun()
         else:
             st.markdown(note.summary)
-    with transcript_col:
-        st.subheader("Transcript")
-        with st.container(height=650):
-            st.markdown(note.transcript)
 
 
 def main() -> None:
@@ -137,16 +150,24 @@ def main() -> None:
             st.session_state["note"] = path
             if existed:
                 processed = parse_note(path).fields.get("processed")
-                st.info(f"Already in your library (processed {processed})")
+                st.session_state["flash"] = f"Already in your library (processed {processed})"
+    if st.session_state.get("flash"):
+        st.info(st.session_state["flash"])
 
     render_sidebar()
     path = st.session_state.get("note")
-    if path is None or not Path(path).exists():
+    if path is None or not path.exists():
         st.write("Paste a link to get its transcript and summary.")
         return
-    note = parse_note(path)
+    try:
+        note = parse_note(path)
+    except (OSError, ValueError) as e:
+        st.error(f"Couldn't read {path.name}: {e}")
+        del st.session_state["note"]
+        return
     render_header(path, note)
     render_columns(path, note)
+    st.session_state.pop("flash", None)
 
 
 main()
