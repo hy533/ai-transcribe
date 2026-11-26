@@ -55,6 +55,7 @@ One note per video (format TBD in spec): frontmatter (title, channel, url, sourc
 ## Key patterns
 - app.py is a thin UI layer; all logic lives in pipeline/notes. Current note path is `st.session_state["note"]`; summary failures are kept in `st.session_state["summary_error"]` to avoid retry loops until Regenerate.
 - Status is stored in the note frontmatter (`unreviewed` / `watch` / `skip`).
+- Never keep downloaded media: audio goes to a `TemporaryDirectory` and is deleted right after transcription (before the Watch/Skip decision). Only the markdown note persists.
 
 ## Known quirks
 - No Docker: containers on macOS can't use Metal, so mlx-whisper would fall back to CPU.
