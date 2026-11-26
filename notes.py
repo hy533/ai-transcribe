@@ -9,6 +9,7 @@ from transcript import format_duration
 
 _UNSAFE = re.compile(r'[/\\:*?"<>|#^\[\]\x00-\x1f\x7f]')
 MAX_TITLE_CHARS = 120
+MAX_FILENAME_BYTES = 255
 
 
 @dataclass
@@ -31,8 +32,12 @@ class Note:
 
 
 def note_filename(title: str, video_id: str) -> str:
-    clean = re.sub(r"\s+", " ", _UNSAFE.sub("", title)).strip()[:MAX_TITLE_CHARS].strip()
-    return f"{clean or video_id} [{video_id}].md"
+    clean = re.sub(r"\s+", " ", _UNSAFE.sub("", title)).strip().lstrip(".")[:MAX_TITLE_CHARS].strip()
+    suffix = f" [{video_id}].md"
+    while clean and len((clean + suffix).encode("utf-8")) > MAX_FILENAME_BYTES:
+        clean = clean[:-1]
+    clean = clean.strip()
+    return f"{clean or video_id}{suffix}"
 
 
 def render_note(meta: VideoMeta, language: str, transcript_source: str, transcript_md: str,

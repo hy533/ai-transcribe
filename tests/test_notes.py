@@ -40,3 +40,15 @@ def test_find_note_matches_source_and_id(tmp_path):
 def test_find_note_ignores_non_note_md(tmp_path):
     (tmp_path / "random.md").write_text("no frontmatter")
     assert find_note(tmp_path, "youtube", "abc123") is None
+
+
+def test_filename_long_cjk_title_fits_byte_limit(tmp_path):
+    name = note_filename("测" * 200, "id1")
+    assert len(name.encode("utf-8")) <= 255 and name.endswith(" [id1].md")
+    p = write_new_note(tmp_path, meta(title="测" * 200), "zh", "captions", "t")
+    assert p.exists()
+
+
+def test_filename_strips_leading_dots():
+    assert note_filename(".foo", "id1") == "foo [id1].md"
+    assert note_filename("...", "id1") == "id1 [id1].md"
