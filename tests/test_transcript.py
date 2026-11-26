@@ -7,6 +7,7 @@ from transcript import (
     normalize_language,
     plain_text,
     render_transcript,
+    whisper_line,
 )
 
 
@@ -50,3 +51,13 @@ def test_render_transcript_cjk_no_space():
 def test_render_transcript_splits_on_span():
     out = render_transcript([Segment(0, "a"), Segment(29, "b"), Segment(30, "c")])
     assert out.splitlines() == ["[00:00] a b", "[00:30] c"]
+
+
+def test_whisper_line_with_duration():
+    assert whisper_line(7500) == "Transcribing 2:05:00 of audio with Whisper (about 4 min)…"
+    assert whisper_line(600) == "Transcribing 10:00 of audio with Whisper (about 1 min)…"
+
+
+def test_whisper_line_unknown_duration():
+    assert whisper_line(None) == "Transcribing audio with Whisper…"
+    assert whisper_line(0) == "Transcribing audio with Whisper…"

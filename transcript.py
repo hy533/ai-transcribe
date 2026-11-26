@@ -36,6 +36,13 @@ def format_duration(seconds: int | None) -> str:
     return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
 
 
+def whisper_line(duration: int | float | None) -> str:
+    if not duration:
+        return "Transcribing audio with Whisper…"
+    minutes = max(1, round(duration / 2100))
+    return f"Transcribing {format_duration(duration)} of audio with Whisper (about {minutes} min)…"
+
+
 def _is_cjk(ch: str) -> bool:
     o = ord(ch)
     return 0x4E00 <= o <= 0x9FFF or 0x3000 <= o <= 0x303F or 0xFF00 <= o <= 0xFFEF

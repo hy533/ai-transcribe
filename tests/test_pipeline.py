@@ -69,7 +69,7 @@ class Fake:
 
 def run(tmp_path, fake, force=False):
     steps = []
-    path, existed = ensure_transcript("https://www.youtube.com/watch?v=abc", tmp_path, fake.deps(), steps.append, force)
+    path, existed = ensure_transcript("https://www.youtube.com/watch?v=abc", tmp_path, fake.deps(), lambda step, *_: steps.append(step), force)
     return path, existed, steps
 
 
@@ -248,3 +248,11 @@ def test_apple_show_link_rejected_before_metadata(tmp_path):
     f = Fake(RuntimeError("get_info must not be called"))
     with pytest.raises(PipelineError, match="That's a show page — open an episode and copy its link."):
         ensure_transcript("https://podcasts.apple.com/us/podcast/the-daily/id1200361736", tmp_path, f.deps(), lambda *a: None)
+
+
+def test_whisper_step_carries_duration(tmp_path):
+    calls = []
+    f = Fake(info(subtitles={}, duration=1916))
+    ensure_transcript("https://www.youtube.com/watch?v=abc", tmp_path, f.deps(),
+                      lambda step, duration=None: calls.append((step, duration)))
+    assert ("whisper", 1916) in calls
