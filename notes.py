@@ -120,3 +120,79 @@ def find_note(vault: Path, source: str, video_id: str) -> Path | None:
         if fields and fields.get("source") == source and str(fields.get("video_id")) == video_id:
             return path
     return None
+
+
+STATUSES = ("unreviewed", "watch", "skip")
+
+
+def _frontmatter_end(lines: list[str]) -> int | None:
+    if not lines or lines[0] != "---":
+        return None
+    for i in range(1, len(lines)):
+        if lines[i] == "---":
+            return i
+    return None
+
+
+def set_field(path: Path, key: str, value) -> None:
+    path = Path(path)
+    lines = path.read_text(encoding="utf-8").split("\n")
+    end = _frontmatter_end(lines)
+    if end is None:
+        raise ValueError(f"no frontmatter: {path}")
+    new_line = yaml.safe_dump({key: value}, allow_unicode=True, sort_keys=False).strip()
+    for i in range(1, end):
+        if lines[i].startswith(f"{key}:"):
+            lines[i] = new_line
+            break
+    else:
+        lines.insert(end, new_line)
+    path.write_text("\n".join(lines), encoding="utf-8")
+
+
+def set_status(path: Path, status: str) -> None:
+    if status not in STATUSES:
+        raise ValueError(f"invalid status: {status}")
+    set_field(path, "status", status)
+
+
+def replace_section(path: Path, heading: str, body: str) -> None:
+    path = Path(path)
+    lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
+    end = _frontmatter_end([l.rstrip("\n") for l in lines])
+    first = (end or -1) + 1
+    marker = f"## {heading}"
+    block = f"{marker}\n\n{body.strip()}\n\n" if body.strip() else f"{marker}\n\n"
+    start = next((i for i in range(first, len(lines)) if lines[i].rstrip("\n") == marker), None)
+    if start is not None:
+        stop = next((i for i in range(start + 1, len(lines)) if lines[i].startswith("## ")), len(lines))
+    else:
+        start = stop = next((i for i in range(first, len(lines)) if lines[i].rstrip("\n") == "## Transcript"), len(lines))
+        if start == len(lines) and lines and not lines[-1].endswith("\n"):
+            lines[-1] += "\n"
+        if start == len(lines) and lines and lines[-1].strip():
+            block = "\n" + block
+    lines[start:stop] = [block]
+    path.write_text("".join(lines), encoding="utf-8")
+
+
+@dataclass
+class NoteInfo:
+    path: Path
+    title: str
+    status: str
+
+
+def list_recent(vault: Path, limit: int) -> list[NoteInfo]:
+    found = []
+    for path in Path(vault).glob("*.md"):
+        try:
+            parts = split_frontmatter(path.read_text(encoding="utf-8"))
+            mtime = path.stat().st_mtime
+        except (OSError, UnicodeDecodeError):
+            continue
+        fields = _load_fields(parts[0]) if parts else None
+        if fields and fields.get("video_id") is not None:
+            found.append((mtime, NoteInfo(path, str(fields.get("title", path.stem)), str(fields.get("status", "unreviewed")))))
+    found.sort(key=lambda x: x[0], reverse=True)
+    return [info for _, info in found[:limit]]
