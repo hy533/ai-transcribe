@@ -123,3 +123,46 @@ TDD on pure logic, no network: caption file parsing (VTT/SRT/json as yt-dlp retu
 - **Notes are edited in place.** The user may add their own tags, fields or sections in Obsidian. Status updates change only the `status` line; Regenerate replaces only the text between `## Summary` and the next heading. Unknown frontmatter fields, extra sections and key order are preserved. Round-trip tests cover a note with user additions.
 - **Reprocess button** on an existing note: reruns the pipeline (e.g. a bad Whisper run, or captions added later) and replaces only the Summary and Transcript sections. `status`, other frontmatter fields and user sections are kept; pipeline-owned fields (`language`, `transcript_source`, `processed`) are updated.
 - **Picking the caption track when YouTube doesn't report the original language:** use the manual track that matches the `-orig` auto-caption language; otherwise fall back to Whisper.
+
+## Engineering review decisions (2026-11-26)
+- **D1 Checkpoint to disk.** Streamlit reruns the script on any click, which kills an in-flight run. Write the note as soon as the transcript exists; the summary fills in afterwards. Opening a note whose Summary section is empty triggers summarisation automatically. A click during the summary step costs only that step.
+- **D2 yt-dlp uses Node** (`js_runtimes: {"node": {}}`; Homebrew Node v25 is installed). Check at startup that `node` is on PATH and show a clear error if not. CLAUDE.md gets `uv lock --upgrade-package yt-dlp && uv sync` as the "YouTube broke" fix.
+- **D3 PyYAML** (declare `pyyaml` in pyproject; it's already installed transitively). New notes are rendered with `yaml.safe_dump(allow_unicode=True, sort_keys=False)`. Edits to existing notes stay line/section-level so user additions survive.
+- **D4 `normalize_language()`**: one helper maps caption codes (`zh-Hans`, `zh-CN`, `ai-zh`, `en-US`, …) and Whisper codes to a base code (`zh`, `en`, …). Used by both the note's `language` field and the summary prompt (prompt names the language explicitly).
+- **D5 Live language eval**: `pytest -m live` (skipped by default) sends a short Chinese and a short English sample to the real Qwen and asserts the summary language (CJK character ratio).
+- **D6 Stream the summary** from Ollama (`stream: true`, `keep_alive: "10m"`) into the UI; write to the note when complete.
+- **D7 First-run notice**: if the Whisper model isn't in the Hugging Face cache, show "first-time download (~1.6 GB)" before transcribing.
+
+## Test plan
+Unit (default `uv run pytest`, offline, no network/model): caption parsing per format; caption track selection (manual > auto in original language; reject `-translated` and danmaku); `normalize_language` table; Bilibili part id; `strip_think`; timestamp formatting; filename sanitising; note render with hostile titles (quotes, colons, `#`, emoji, Chinese); parse + find by `video_id`; `set_status` and `replace_section` on notes containing user edits; pipeline orchestration with fake fetcher/transcriber/LLM covering: captions path, Whisper path, summary failure keeps note, Ollama down, too-long transcript, existing note opens, empty-summary note resumes, reprocess keeps status and user sections; Node check; unsupported URL error.
+Live (`-m live`): D5 language eval.
+Manual E2E: one captioned YouTube video, one uncaptioned video (Whisper), one Chinese Bilibili video.
+
+## NOT in scope
+- Background worker / job queue (D1 chose checkpointing instead).
+- Chunked map-reduce summarisation for transcripts over 64k tokens.
+- Playlists, channels, bulk; other sites; translation; diarization.
+- Auto-updating yt-dlp (manual command documented instead).
+
+## Failure modes
+| Path | Failure | Handled | Tested | User sees |
+|---|---|---|---|---|
+| metadata | YouTube change breaks yt-dlp | error names step + upgrade hint | unit (fake raises) | clear error |
+| captions | only translated/danmaku tracks | fall back to Whisper | unit | normal run |
+| whisper | first-run download slow | D7 notice | unit | notice |
+| summary | Ollama not running | note saved without summary | unit | error + Regenerate |
+| summary | transcript > 64k | error, note saved | unit | clear error |
+| UI | click mid-run | D1 checkpoint/resume | unit | summary resumes |
+
+## GSTACK REVIEW REPORT
+
+| Review | Trigger | Why | Runs | Status | Findings |
+|--------|---------|-----|------|--------|----------|
+| CEO Review | `/plan-ceo-review` | Scope & strategy | 0 | — | — |
+| Codex Review | `/codex review` | Independent 2nd opinion | 0 | — | — |
+| Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | CLEAR | 7 issues, 0 critical gaps |
+| Design Review | `/plan-design-review` | UI/UX gaps | 0 | — | — |
+| DX Review | `/plan-devex-review` | Developer experience gaps | 0 | — | — |
+
+- **UNRESOLVED:** 0
+- **VERDICT:** ENG CLEARED — design review next.
