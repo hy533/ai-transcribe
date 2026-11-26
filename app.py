@@ -9,7 +9,7 @@ from pipeline import Deps, ensure_summary, ensure_transcript, needs_summary
 from transcript import whisper_line
 
 STEP_LINES = {
-    "metadata": "Reading video info…",
+    "metadata": "Reading info…",
     "captions": "Using the video's captions…",
     "whisper-download": "First-time Whisper model download (~1.6 GB)…",
 }

@@ -45,9 +45,20 @@ def source_of(info: dict) -> str:
     raise PipelineError("metadata", "Only YouTube, Bilibili and Apple Podcasts links are supported.")
 
 
+APPLE_HOSTS = ("podcasts.apple.com", "itunes.apple.com")
+
+
 def is_apple_show_link(url: str) -> bool:
     parsed = urlparse(url)
-    return parsed.hostname == "podcasts.apple.com" and "i" not in parse_qs(parsed.query)
+    episode = parse_qs(parsed.query).get("i", [""])[0]
+    return parsed.hostname in APPLE_HOSTS and not episode.isdigit()
+
+
+def normalize_link(url: str) -> str:
+    parsed = urlparse(url)
+    if parsed.hostname == "itunes.apple.com":
+        return parsed._replace(netloc="podcasts.apple.com").geturl()
+    return url
 
 
 def video_key(info: dict, url: str) -> str:

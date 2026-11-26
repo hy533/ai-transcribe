@@ -39,7 +39,7 @@ def format_duration(seconds: int | None) -> str:
 def whisper_line(duration: int | float | None) -> str:
     if not duration:
         return "Transcribing audio with Whisper…"
-    minutes = max(1, round(duration / 2100))
+    minutes = max(1, int(duration / 2100 + 0.5))
     return f"Transcribing {format_duration(duration)} of audio with Whisper (about {minutes} min)…"
 
 

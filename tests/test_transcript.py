@@ -61,3 +61,7 @@ def test_whisper_line_with_duration():
 def test_whisper_line_unknown_duration():
     assert whisper_line(None) == "Transcribing audio with Whisper…"
     assert whisper_line(0) == "Transcribing audio with Whisper…"
+
+
+def test_whisper_line_rounds_half_up():
+    assert whisper_line(5250) == "Transcribing 1:27:30 of audio with Whisper (about 3 min)…"

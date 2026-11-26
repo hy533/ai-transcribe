@@ -3,7 +3,7 @@ import shutil
 import pytest
 
 import config
-from fetch import PipelineError, build_meta, check_node, is_apple_show_link, source_of, video_key, ydl_opts
+from fetch import PipelineError, build_meta, check_node, is_apple_show_link, normalize_link, source_of, video_key, ydl_opts
 
 
 def test_ydl_opts_uses_node():
@@ -104,3 +104,17 @@ def test_apple_show_link_detection():
     assert not is_apple_show_link("https://podcasts.apple.com/us/podcast/x/id1200361736?i=1000804177272&uo=4")
     assert not is_apple_show_link("https://podcasts.apple.com/cn/podcast/x/id1?i=2")
     assert not is_apple_show_link("https://www.youtube.com/watch?v=abc")
+
+
+def test_itunes_links_are_apple_links():
+    assert is_apple_show_link("https://itunes.apple.com/us/podcast/the-daily/id1200361736")
+    assert not is_apple_show_link("https://itunes.apple.com/us/podcast/x/id1200361736?i=1000804177272")
+
+
+def test_non_numeric_episode_id_is_not_an_episode():
+    assert is_apple_show_link("https://podcasts.apple.com/us/podcast/x/id1200361736?i=abc")
+
+
+def test_normalize_link_rewrites_itunes_host():
+    assert normalize_link("https://itunes.apple.com/us/podcast/x/id1?i=2&uo=4") == "https://podcasts.apple.com/us/podcast/x/id1?i=2&uo=4"
+    assert normalize_link("https://www.youtube.com/watch?v=abc") == "https://www.youtube.com/watch?v=abc"

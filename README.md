@@ -8,7 +8,7 @@ Paste a link and it:
 2. Writes a summary with a local Ollama model. Chinese videos get Chinese summaries, English videos get English ones.
 3. Saves both as one markdown note in an Obsidian vault.
 
-You then read the summary and transcript side by side and mark the video **Watch** or **Skip**. The Obsidian vault is the library; there is no separate database. Nothing leaves your Mac except the requests to YouTube or Bilibili.
+You then read the summary and transcript side by side and mark the video **Watch** or **Skip**. The Obsidian vault is the library; there is no separate database. Nothing leaves your Mac except the requests to YouTube, Bilibili or Apple Podcasts.
 
 ---
 
@@ -173,7 +173,7 @@ yt-dlp needs `node` on `PATH`. Check with `node --version`. Reinstall with `brew
 
 ### Apple Podcasts
 
-- Only episode links work. A show link (no `?i=` in it) gets "That's a show page — open an episode and copy its link."
+- Only episode links work; old `itunes.apple.com` links are rewritten to `podcasts.apple.com` automatically. A show link (no `?i=` in it) gets "That's a show page — open an episode and copy its link."
 - The show name comes from yt-dlp's `series` field and is saved as `channel`. If episode info stops loading, upgrade yt-dlp (above).
 - The summary limit is about 3 hours of Chinese or 4 hours of English audio; longer episodes keep their transcript and show the "too long" error.
 

@@ -45,7 +45,7 @@ uv sync                                          # install/refresh deps
 uv run streamlit run app.py                      # run the app (localhost)
 uv run pytest                                    # tests
 uv run pytest -m live                            # live tests (network/Ollama)
-uv lock --upgrade-package yt-dlp && uv sync      # fix "YouTube changed" metadata errors
+uv lock --upgrade-package yt-dlp && uv sync      # fix "site changed" metadata errors
 uv add <pkg>                                     # add a dependency
 ```
 

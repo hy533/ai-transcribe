@@ -120,7 +120,7 @@ def test_metadata_failure_is_pipeline_error(tmp_path):
     with pytest.raises(PipelineError) as e:
         run(tmp_path, Fake(DownloadError("Private video")))
     assert e.value.step == "metadata"
-    assert "Private video" in e.value.message and "uv lock --upgrade-package yt-dlp" in e.value.message
+    assert "Private video" in e.value.message and "uv lock --upgrade-package yt-dlp" in e.value.message and "If the site changed" in e.value.message
 
 
 def test_unsupported_site(tmp_path):
@@ -216,7 +216,7 @@ def test_empty_captions_language_becomes_whisper_language(tmp_path):
 def test_whisper_no_segments_is_error(tmp_path):
     with pytest.raises(PipelineError) as e:
         run(tmp_path, Fake(info(subtitles={}), whisper_result=([], "en")))
-    assert e.value.step == "whisper" and e.value.message == "No speech found in this video."
+    assert e.value.step == "whisper" and e.value.message == "No speech found in this audio."
 
 
 def test_playlist_rejected(tmp_path):
