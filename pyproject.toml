@@ -1,0 +1,15 @@
+[project]
+name = "ai-transcribe"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "mlx-whisper>=0.4.3",
+    "requests>=2.34.2",
+    "streamlit>=1.67.0",
+    "yt-dlp>=2026.11.23",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+]
