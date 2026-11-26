@@ -4,6 +4,7 @@ version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
     "mlx-whisper>=0.4.3",
+    "pyyaml>=6.0.4",
     "requests>=2.34.2",
     "streamlit>=1.67.0",
     "yt-dlp>=2026.11.23",
@@ -13,3 +14,8 @@ dependencies = [
 dev = [
     "pytest>=9.2.0",
 ]
+
+[tool.pytest.ini_options]
+markers = ["live: hits the real local Ollama model"]
+addopts = "-m 'not live'"
+pythonpath = ["."]
