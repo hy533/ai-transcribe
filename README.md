@@ -101,6 +101,7 @@ captions.py      pick a caption track, parse VTT/SRT/JSON captions
 transcript.py    segments -> timestamped markdown, language normalising
 summarize.py     Ollama streaming summary, context-fit check, <think> stripping
 notes.py         note format: write/parse/find, set_status, replace_section, list_recent
+cli.py           command-line front end for agents and scripts (JSON on stdout)
 config.py        vault path, model, limits
 tests/           pytest (live tests marked `live`)
 docs/superpowers/  design spec and implementation plan
@@ -117,6 +118,31 @@ link → video info ─ note exists? ─yes→ open it
                                                                   ▼
                                             save note → stream summary into note
 ```
+
+## Command line (for agents and scripts)
+
+`cli.py` exposes the same pipeline for agents that can run shell commands (Pi, Claude Code) and for workflow tools (n8n's Execute Command node). It uses the same vault and config as the app.
+
+```bash
+uv run python cli.py transcribe <url> [--force] [--no-summary]
+uv run python cli.py read <note.md> [--section summary|transcript]
+uv run python cli.py list [--status unreviewed|watch|skip] [--limit N]
+uv run python cli.py status <note.md> unreviewed|watch|skip
+```
+
+- **stdout** carries only the result: JSON for `transcribe`, `list` and `status`; plain text for `read`. Progress lines (`step: metadata`, `step: whisper`, ...) and errors go to **stderr**, so a caller can parse stdout directly.
+- **Exit codes:** `0` success, `1` failure with `{"step": ..., "error": ...}` (or `{"error": ...}`) as the last stderr line.
+- `transcribe` reuses an existing note (`"existed": true`) without downloading anything. A failed summary still exits `0`: the note is saved and `summary_error` says why (e.g. Ollama not running).
+- `transcribe` output keeps the transcript out of stdout on purpose (hours of text would flood an agent's context); use `read --section transcript` when you need it.
+
+Example output of `transcribe`:
+
+```json
+{"path": "/.../videos/Title [abc].md", "title": "Title", "source": "youtube", "language": "en",
+ "transcript_source": "captions", "status": "unreviewed", "existed": false, "summary_error": null}
+```
+
+Run from the project folder (or `uv run --project <path> python <path>/cli.py ...`). Whisper runs can take minutes on long videos; give the caller a generous timeout.
 
 ## Tests
 

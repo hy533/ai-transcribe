@@ -31,6 +31,7 @@ captions.py      # pick caption track, parse VTT/JSON captions
 transcript.py    # segments -> markdown transcript, language normalizing
 summarize.py     # Ollama streaming summary, context-fit check, <think> stripping
 notes.py         # note format: write/parse/find, set_status, replace_section, list_recent
+cli.py           # command-line front end for agents/scripts (transcribe/read/list/status, JSON on stdout)
 config.py        # vault path, model, limits
 tests/           # pytest (live tests marked `live`)
 docs/superpowers/ # specs and plans
@@ -54,6 +55,7 @@ One note per video (format TBD in spec): frontmatter (title, channel, url, sourc
 
 ## Key patterns
 - app.py is a thin UI layer; all logic lives in pipeline/notes. Current note path is `st.session_state["note"]`; summary failures are kept in `st.session_state["summary_error"]` to avoid retry loops until Regenerate.
+- cli.py is a thin front end like app.py: stdout is only the result (JSON / plain text), progress + errors go to stderr; exit 1 on failure. MCP server and HTTP service are deliberately not built yet (CLI first; add only when Muse/n8n need them).
 - Status is stored in the note frontmatter (`unreviewed` / `watch` / `skip`).
 - Never keep downloaded media: audio goes to a `TemporaryDirectory` and is deleted right after transcription (before the Watch/Skip decision). Only the markdown note persists.
 
