@@ -63,6 +63,7 @@ One note per video (format TBD in spec): frontmatter (title, channel, url, sourc
 - Bilibili subtitles arrive from yt-dlp as inline `data` (SRT text, no `url`); `CaptionTrack.data` carries it and `fetch_captions` returns it directly.
 - `yt-dlp-ejs` is required for YouTube JS challenges (node solver script); it is a project dependency.
 - Playlists, channels and multi-video links are rejected (single video only).
+- Apple Podcasts: episode links only (`?i=` required; show links rejected before yt-dlp runs). No captions, so always Whisper. Show name comes from yt-dlp `series` → `channel`; notes get `tags: [podcast]`.
 - Rolling-line dedupe applies only to auto captions; manual captions stay verbatim.
 - Ollama's default context is short; use the `-64k` model variant for long transcripts.
 - Bilibili's CDN answers a single whole-file audio request with HTTP 567/403; `download_audio` sets `http_chunk_size` (10 MB ranges), which works.
@@ -70,6 +71,7 @@ One note per video (format TBD in spec): frontmatter (title, channel, url, sourc
 - The summary labels "Key points" / "Who it's for" stay English in Chinese summaries, and Qwen occasionally drops the "Who it's for" line.
 
 ## What's built / backlog
+- [x] Apple Podcasts episode links (branch `feature/apple-podcasts`, 2026-11-26)
 - [x] Environment
 - [x] Pipeline modules + Streamlit UI
 - [x] End-to-end check with real links (Task 9, 2026-11-26): YouTube captions, YouTube Whisper (zh), Bilibili Whisper
