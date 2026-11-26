@@ -84,7 +84,7 @@ def fetch_captions(track: CaptionTrack) -> str:
 
 def download_audio(url: str, tmpdir: Path) -> Path:
     from yt_dlp import YoutubeDL
-    opts = {**ydl_opts(), "format": "bestaudio/best", "outtmpl": str(tmpdir / "audio.%(ext)s")}
+    opts = {**ydl_opts(), "format": "bestaudio/best", "http_chunk_size": 10 * 1024 * 1024, "outtmpl": str(tmpdir / "audio.%(ext)s")}
     with YoutubeDL(opts) as ydl:
         ydl.download([url])
     try:

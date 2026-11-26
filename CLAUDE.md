@@ -1,5 +1,8 @@
+## Last Resumed: 2026-11-26 17:13
+All pipeline modules and the Streamlit UI are built and reviewed on `feature/video-triage` (93 offline + 2 live tests passing). In progress: Task 9, the real-link end-to-end check on three user-supplied links (two YouTube, one Bilibili). Next: record findings, commit `docs: e2e findings`, then finish the branch (merge/PR only with the user's OK).
+
 ## Current State (2026-11-26)
-Pipeline modules and the Streamlit UI (`app.py`) are built on branch `feature/video-triage`. app.py has no unit tests (verified via Streamlit AppTest only); real-link end-to-end check is Task 9.
+Pipeline modules and the Streamlit UI (`app.py`) are built on branch `feature/video-triage`. app.py has no unit tests (verified via Streamlit AppTest only); real-link end-to-end check (Task 9) passed 2026-11-26.
 
 # AI Transcribe
 
@@ -61,8 +64,11 @@ One note per video (format TBD in spec): frontmatter (title, channel, url, sourc
 - Playlists, channels and multi-video links are rejected (single video only).
 - Rolling-line dedupe applies only to auto captions; manual captions stay verbatim.
 - Ollama's default context is short; use the `-64k` model variant for long transcripts.
+- Bilibili's CDN answers a single whole-file audio request with HTTP 567/403; `download_audio` sets `http_chunk_size` (10 MB ranges), which works.
+- Whisper sometimes writes Chinese in Traditional characters (seen on a Bilibili video); the summary is still Simplified.
+- The summary labels "Key points" / "Who it's for" stay English in Chinese summaries, and Qwen occasionally drops the "Who it's for" line.
 
 ## What's built / backlog
 - [x] Environment
 - [x] Pipeline modules + Streamlit UI
-- [ ] End-to-end check with a real link (Task 9)
+- [x] End-to-end check with real links (Task 9, 2026-11-26): YouTube captions, YouTube Whisper (zh), Bilibili Whisper

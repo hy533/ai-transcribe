@@ -27,7 +27,7 @@ def process_link(url: str, force: bool = False):
         try:
             path, existed = ensure_transcript(url, config.VAULT_DIR, Deps.real(), on_step, force=force)
         except PipelineError as e:
-            status.update(label="Failed", state="error")
+            status.update(label="Failed", state="error", expanded=True)
             st.error(f"{e.step}: {e.message}")
             return None
         status.update(label=f"Saved → {path.name}", state="complete", expanded=False)

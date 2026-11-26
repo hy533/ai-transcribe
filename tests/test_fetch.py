@@ -64,3 +64,20 @@ def test_download_audio_no_file_raises(monkeypatch, tmp_path):
     monkeypatch.setattr(yt_dlp, "YoutubeDL", FakeYDL)
     with pytest.raises(RuntimeError, match="Audio download produced no file"):
         download_audio("u", tmp_path)
+
+
+def test_download_audio_uses_range_chunks(monkeypatch, tmp_path):
+    # Bilibili's CDN answers a single whole-file request with HTTP 567; ranged chunks work.
+    import yt_dlp
+    from fetch import download_audio
+    seen = {}
+
+    class FakeYDL:
+        def __init__(self, opts): seen.update(opts)
+        def __enter__(self): return self
+        def __exit__(self, *a): pass
+        def download(self, urls): (tmp_path / "audio.m4a").write_bytes(b"x")
+
+    monkeypatch.setattr(yt_dlp, "YoutubeDL", FakeYDL)
+    download_audio("u", tmp_path)
+    assert seen["http_chunk_size"] == 10 * 1024 * 1024
