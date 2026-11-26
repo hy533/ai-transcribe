@@ -1,3 +1,5 @@
+import pytest
+
 from notes import VideoMeta, find_note, note_filename, parse_note, write_new_note
 
 HOSTILE = 'He said: "Don\'t #panic" — 测试 🎉 [part 1]'
@@ -52,3 +54,12 @@ def test_filename_long_cjk_title_fits_byte_limit(tmp_path):
 def test_filename_strips_leading_dots():
     assert note_filename(".foo", "id1") == "foo [id1].md"
     assert note_filename("...", "id1") == "id1 [id1].md"
+    assert note_filename(". .foo", "id1") == "foo [id1].md"
+
+
+def test_write_new_note_refuses_overwrite(tmp_path):
+    p = write_new_note(tmp_path, meta(), "en", "captions", "t")
+    p.write_text("hand edited")
+    with pytest.raises(ValueError, match="already exists"):
+        write_new_note(tmp_path, meta(), "en", "captions", "t")
+    assert p.read_text() == "hand edited"

@@ -64,6 +64,7 @@ def test_stream_summary_request_and_chunks(monkeypatch):
     assert list(stream_summary("text", "en")) == ["Hel", "lo"]
     body = captured["json"]
     assert captured["url"] == config.OLLAMA_URL + "/api/chat"
+    assert captured["timeout"] == (5, 300)
     assert captured["checked"] and captured["closed"] and captured["stream"] is True
     assert body["model"] == "qwen3.8-27b-64k"
     assert body["stream"] is True and body["think"] is False

@@ -20,7 +20,9 @@ def info(**kw):
 
 
 class Fake:
-    def __init__(self, info_=None, captions=VTT, cached=True, chunks=("Sum", "mary"), stream_exc=None):
+    def __init__(self, info_=None, captions=VTT, cached=True, chunks=("Sum", "mary"), stream_exc=None,
+                 audio_exc=None, transcribe_exc=None, whisper_result=([Segment(0.0, "你好")], "zh")):
+        self.audio_exc, self.transcribe_exc, self.whisper_result = audio_exc, transcribe_exc, whisper_result
         self.info = info_ or info()
         self.captions = captions
         self.cached = cached
@@ -37,10 +39,14 @@ class Fake:
 
         def fetch_captions(track):
             self.calls["captions"] += 1
+            if isinstance(self.captions, Exception):
+                raise self.captions
             return self.captions
 
         def download_audio(url, tmpdir):
             self.calls["audio"] += 1
+            if self.audio_exc:
+                raise self.audio_exc
             p = Path(tmpdir) / "a.m4a"
             p.write_bytes(b"x")
             self.audio_paths.append(p)
@@ -48,7 +54,9 @@ class Fake:
 
         def transcribe(audio):
             self.calls["transcribe"] += 1
-            return [Segment(0.0, "你好")], "zh"
+            if self.transcribe_exc:
+                raise self.transcribe_exc
+            return self.whisper_result
 
         def stream(text, language):
             self.calls["stream"] += 1
@@ -175,3 +183,62 @@ def test_reprocess_keeps_status_and_user_section(tmp_path):
     assert n.fields["status"] == "watch" and "keep me" in path.read_text()
     assert "brand new text" in n.transcript and "hello world" not in n.transcript
     assert n.summary == "" and n.fields["processed"] == date.today().isoformat()
+
+
+class HTTP429(Exception):
+    pass
+
+
+def test_caption_fetch_error_falls_back_to_whisper(tmp_path):
+    f = Fake(captions=HTTP429("HTTP Error 429"))
+    path, _, steps = run(tmp_path, f)
+    assert f.calls["transcribe"] == 1 and "whisper" in steps
+    assert parse_note(path).fields["transcript_source"] == "whisper"
+
+
+def test_whisper_download_failure_is_pipeline_error(tmp_path):
+    with pytest.raises(PipelineError) as e:
+        run(tmp_path, Fake(info(subtitles={}), audio_exc=RuntimeError("no audio")))
+    assert e.value.step == "whisper" and "no audio" in e.value.message
+
+
+def test_whisper_transcribe_failure_is_pipeline_error(tmp_path):
+    with pytest.raises(PipelineError) as e:
+        run(tmp_path, Fake(info(subtitles={}), transcribe_exc=RuntimeError("boom")))
+    assert e.value.step == "whisper" and e.value.message == "boom"
+
+
+def test_empty_captions_language_becomes_whisper_language(tmp_path):
+    path, _, _ = run(tmp_path, Fake(captions="WEBVTT\n\n"))
+    assert parse_note(path).fields["language"] == "zh"
+
+
+def test_whisper_no_segments_is_error(tmp_path):
+    with pytest.raises(PipelineError) as e:
+        run(tmp_path, Fake(info(subtitles={}), whisper_result=([], "en")))
+    assert e.value.step == "whisper" and e.value.message == "No speech found in this video."
+
+
+def test_playlist_rejected(tmp_path):
+    for t in ("playlist", "multi_video"):
+        with pytest.raises(PipelineError) as e:
+            run(tmp_path, Fake(info(_type=t)))
+        assert e.value.step == "metadata" and "Playlists and channels" in e.value.message
+
+
+def test_existing_unmatched_file_not_overwritten(tmp_path):
+    from notes import note_filename
+    clash = tmp_path / note_filename("T", "abc")
+    clash.write_text("hand edited, no frontmatter")
+    with pytest.raises(PipelineError) as e:
+        run(tmp_path, Fake())
+    assert e.value.step == "saved" and "already exists" in e.value.message and note_filename("T", "abc") in e.value.message
+    assert clash.read_text() == "hand edited, no frontmatter"
+
+
+def test_summary_headings_demoted(tmp_path):
+    f = Fake(chunks=["## Foo\nbody\n", "# Bar\n**Who it's for:** x"])
+    path, _, _ = run(tmp_path, f)
+    out = ensure_summary(path, f.deps(), lambda c: None)
+    assert "## " not in out and "**Foo**" in out and "**Bar**" in out
+    assert set(__import__("notes").split_sections(path.read_text().split("---\n", 2)[2])) == {"Summary", "Transcript"}

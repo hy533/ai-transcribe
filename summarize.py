@@ -56,7 +56,7 @@ def stream_summary(transcript_text: str, language: str) -> Iterator[str]:
         "options": {"num_ctx": config.NUM_CTX},
     }
     done = False
-    with requests.post(f"{config.OLLAMA_URL}/api/chat", json=body, stream=True, timeout=(5, None)) as resp:
+    with requests.post(f"{config.OLLAMA_URL}/api/chat", json=body, stream=True, timeout=(5, 300)) as resp:
         resp.raise_for_status()
         for line in resp.iter_lines():
             if not line:

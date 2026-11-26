@@ -18,7 +18,7 @@ def test_parse_vtt_strips_tags():
 
 
 def test_parse_vtt_dedupes_rolling_lines():
-    text = " ".join(s.text for s in parse_captions(read("auto.vtt"), "vtt"))
+    text = " ".join(s.text for s in parse_captions(read("auto.vtt"), "vtt", rolling=True))
     assert text.count("we are going") == 1 and text.count("to the store") == 1 and "today" in text
 
 
@@ -32,6 +32,13 @@ def yt(language=None, subs=None, auto=None):
 
 def fmt(ext="vtt"):
     return [{"ext": "json3", "url": "j"}, {"ext": ext, "url": "u-" + ext}]
+
+
+SRT_DATA = "1\n00:00:01,000 --> 00:00:02,000\n你好\n"
+
+
+def bfmt():
+    return [{"ext": "srt", "data": SRT_DATA}]
 
 
 def test_manual_original_language_preferred():
@@ -58,15 +65,29 @@ def test_no_language_info_returns_none():
 
 
 def test_bilibili_skips_danmaku_prefers_human():
-    info = {"extractor_key": "BiliBili", "subtitles": {"danmaku": [{"ext": "xml", "url": "d"}], "ai-zh": fmt("srt"), "zh-CN": fmt("srt")}}
+    info = {"extractor_key": "BiliBili", "subtitles": {"danmaku": [{"ext": "xml", "url": "d"}], "ai-zh": bfmt(), "zh-CN": bfmt()}}
     t = pick_caption_track(info)
     assert (t.lang, t.ext) == ("zh-CN", "srt")
 
 
 def test_bilibili_ai_track_used_when_only_one():
-    info = {"extractor_key": "BiliBili", "subtitles": {"danmaku": [{"ext": "xml", "url": "d"}], "ai-zh": fmt("srt")}}
+    info = {"extractor_key": "BiliBili", "subtitles": {"danmaku": [{"ext": "xml", "url": "d"}], "ai-zh": bfmt()}}
     assert pick_caption_track(info).lang == "ai-zh"
 
 
 def test_track_without_vtt_or_srt_ignored():
     assert pick_caption_track(yt("en", subs={"en": [{"ext": "json3", "url": "j"}]})) is None
+
+
+def test_bilibili_data_only_track_picked_and_fetched():
+    info = {"extractor_key": "BiliBili", "subtitles": {"zh-CN": bfmt()}}
+    t = pick_caption_track(info)
+    assert (t.ext, t.url, t.data) == ("srt", "", SRT_DATA)
+    from fetch import fetch_captions
+    assert fetch_captions(t) == SRT_DATA
+
+
+def test_manual_keeps_genuine_repeats():
+    srt = "1\n00:00:01,000 --> 00:00:02,000\n好的\n\n2\n00:00:02,000 --> 00:00:03,000\n好的\n\n3\n00:00:03,000 --> 00:00:04,000\n走吧\n"
+    assert [s.text for s in parse_captions(srt, "srt")] == ["好的", "好的", "走吧"]
+    assert [s.text for s in parse_captions(srt, "srt", rolling=True)] == ["好的", "走吧"]

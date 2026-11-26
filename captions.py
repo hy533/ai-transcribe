@@ -17,7 +17,7 @@ def _seconds(ts: str) -> float:
     return total
 
 
-def parse_captions(text: str, ext: str) -> list[Segment]:
+def parse_captions(text: str, ext: str, rolling: bool = False) -> list[Segment]:
     segments: list[Segment] = []
     prev_lines: list[str] = []
     for block in re.split(r"\n\s*\n", text.replace("\r\n", "\n")):
@@ -34,10 +34,11 @@ def parse_captions(text: str, ext: str) -> list[Segment]:
         if not cur:
             continue
         overlap = 0
-        for k in range(min(len(prev_lines), len(cur)), 0, -1):
-            if prev_lines[-k:] == cur[:k]:
-                overlap = k
-                break
+        if rolling:
+            for k in range(min(len(prev_lines), len(cur)), 0, -1):
+                if prev_lines[-k:] == cur[:k]:
+                    overlap = k
+                    break
         prev_lines = cur
         fresh = cur[overlap:]
         if fresh:
@@ -50,14 +51,15 @@ class CaptionTrack:
     lang: str
     kind: str  # "manual"|"auto"
     ext: str
-    url: str
+    url: str = ""
+    data: str | None = None
 
 
 def _make_track(lang: str, kind: str, formats: list[dict]) -> CaptionTrack | None:
     for ext in ("vtt", "srt"):
         for f in formats:
-            if f.get("ext") == ext and f.get("url"):
-                return CaptionTrack(lang, kind, ext, f["url"])
+            if f.get("ext") == ext and (f.get("url") or f.get("data")):
+                return CaptionTrack(lang, kind, ext, f.get("url") or "", f.get("data"))
     return None
 
 

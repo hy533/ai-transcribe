@@ -25,6 +25,7 @@ def ydl_opts() -> dict:
     opts = {
         "js_runtimes": {"node": {}},
         "noplaylist": True,
+        "extract_flat": "in_playlist",
         "quiet": True,
         "no_warnings": True,
     }
@@ -48,6 +49,7 @@ def video_key(info: dict, url: str) -> str:
         p = parse_qs(urlparse(url).query).get("p", [""])[0]
         if p.isdigit() and int(p) > 1 and not re.search(rf"_p{int(p)}$", vid):
             return f"{vid}_p{int(p)}"
+        return re.sub(r"_p1$", "", vid)
     return vid
 
 
@@ -73,6 +75,8 @@ def get_info(url: str) -> dict:
 
 
 def fetch_captions(track: CaptionTrack) -> str:
+    if track.data is not None:
+        return track.data
     from yt_dlp import YoutubeDL
     with YoutubeDL(ydl_opts()) as ydl:
         return ydl.urlopen(track.url).read().decode("utf-8")
@@ -83,7 +87,10 @@ def download_audio(url: str, tmpdir: Path) -> Path:
     opts = {**ydl_opts(), "format": "bestaudio/best", "outtmpl": str(tmpdir / "audio.%(ext)s")}
     with YoutubeDL(opts) as ydl:
         ydl.download([url])
-    return next(tmpdir.glob("audio.*"))
+    try:
+        return next(tmpdir.glob("audio.*"))
+    except StopIteration:
+        raise RuntimeError("Audio download produced no file") from None
 
 
 def whisper_cached() -> bool:

@@ -42,7 +42,7 @@ def render_sidebar() -> None:
     for item in items:
         title = item.title if len(item.title) <= 40 else item.title[:40] + "…"
         mark = STATUS_MARKS.get(item.status, "● ")
-        if st.sidebar.button(mark + title, key=str(item.path), use_container_width=True):
+        if st.sidebar.button(mark + title, key=str(item.path), width="stretch"):
             st.session_state["note"] = item.path
             st.rerun()
 
@@ -64,7 +64,8 @@ def reprocess_dialog(url: str) -> None:
 def render_header(path: Path, note) -> None:
     fields = note.fields
     left, right = st.columns([12, 1])
-    left.markdown(f"### [{fields.get('title')}]({fields.get('url')})")
+    title = str(fields.get("title")).replace("[", "\\[").replace("]", "\\]")
+    left.markdown(f"### [{title}]({fields.get('url')})")
     with right.popover("⋯"):
         if st.button("Regenerate summary", key="regenerate"):
             try:
@@ -87,7 +88,7 @@ def render_header(path: Path, note) -> None:
                       type="primary" if status == choice else "secondary"):
             try:
                 set_status(path, choice)
-            except OSError as e:
+            except (OSError, ValueError) as e:
                 st.toast(f"Couldn't save status: {e}", icon="❌")
             else:
                 st.toast(f"Marked as {choice}")
@@ -101,7 +102,7 @@ def render_columns(path: Path, note) -> None:
     with transcript_col:
         st.subheader("Transcript")
         with st.container(height=650):
-            st.markdown(note.transcript)
+            st.text(note.transcript)
     with summary_col:
         st.subheader("Summary")
         if str(path) in errors:

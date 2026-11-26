@@ -85,3 +85,10 @@ def test_list_recent_order_and_limit(tmp_path):
 
 def test_list_recent_empty_vault(tmp_path):
     assert list_recent(tmp_path, 30) == []
+
+
+def test_replace_section_heading_trailing_space(user_edited_note):
+    p = user_edited_note
+    p.write_text(p.read_text().replace("## Summary\n", "## Summary \n"))
+    replace_section(p, "Summary", "S")
+    assert p.read_text().count("## Summary") == 1 and parse_note(p).summary == "S"

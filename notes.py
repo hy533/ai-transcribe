@@ -32,7 +32,7 @@ class Note:
 
 
 def note_filename(title: str, video_id: str) -> str:
-    clean = re.sub(r"\s+", " ", _UNSAFE.sub("", title)).strip().lstrip(".")[:MAX_TITLE_CHARS].strip()
+    clean = re.sub(r"\s+", " ", _UNSAFE.sub("", title)).strip().lstrip(". ")[:MAX_TITLE_CHARS].strip()
     suffix = f" [{video_id}].md"
     while clean and len((clean + suffix).encode("utf-8")) > MAX_FILENAME_BYTES:
         clean = clean[:-1]
@@ -63,7 +63,11 @@ def render_note(meta: VideoMeta, language: str, transcript_source: str, transcri
 def write_new_note(vault: Path, meta: VideoMeta, language: str, transcript_source: str,
                    transcript_md: str) -> Path:
     path = Path(vault) / note_filename(meta.title, meta.video_id)
-    path.write_text(render_note(meta, language, transcript_source, transcript_md), encoding="utf-8")
+    try:
+        with open(path, "x", encoding="utf-8") as f:
+            f.write(render_note(meta, language, transcript_source, transcript_md))
+    except FileExistsError:
+        raise ValueError(f"A note named '{path.name}' already exists in the vault") from None
     return path
 
 
@@ -163,7 +167,7 @@ def replace_section(path: Path, heading: str, body: str) -> None:
     first = (end or -1) + 1
     marker = f"## {heading}"
     block = f"{marker}\n\n{body.strip()}\n\n" if body.strip() else f"{marker}\n\n"
-    start = next((i for i in range(first, len(lines)) if lines[i].rstrip("\n") == marker), None)
+    start = next((i for i in range(first, len(lines)) if lines[i].rstrip() == marker), None)
     if start is not None:
         stop = next((i for i in range(start + 1, len(lines)) if lines[i].startswith("## ")), len(lines))
     else:
