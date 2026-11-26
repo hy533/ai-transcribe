@@ -1,5 +1,5 @@
 ## Current State (2026-11-26)
-Environment is set up (uv, Python 3.12, deps installed). No app code yet. Next: brainstorm → spec → plan for the paste-link → transcript → summary → Obsidian note pipeline.
+Pipeline modules and the Streamlit UI (`app.py`) are built on branch `feature/video-triage`. app.py has no unit tests (verified via Streamlit AppTest only); real-link end-to-end check is Task 9.
 
 # AI Transcribe
 
@@ -21,24 +21,37 @@ Follows the global workflow. Single user, runs only on this Mac.
 
 ## Repo layout
 ```
+app.py           # Streamlit UI only (sidebar, header, summary/transcript columns)
+pipeline.py      # ensure_transcript / ensure_summary orchestration (Deps injected for tests)
+fetch.py         # yt-dlp metadata/captions/audio, Whisper, PipelineError, check_node
+captions.py      # pick caption track, parse VTT/JSON captions
+transcript.py    # segments -> markdown transcript, language normalizing
+summarize.py     # Ollama streaming summary, context-fit check, <think> stripping
+notes.py         # note format: write/parse/find, set_status, replace_section, list_recent
+config.py        # vault path, model, limits
+tests/           # pytest (live tests marked `live`)
+docs/superpowers/ # specs and plans
 pyproject.toml   # deps (managed by uv)
 uv.lock          # locked versions
-.python-version  # 3.12
 CLAUDE.md        # this file
 ```
 
 ## Dev commands
 ```bash
-uv sync                 # install/refresh deps
-uv run pytest           # tests
-uv add <pkg>            # add a dependency
+uv sync                                          # install/refresh deps
+uv run streamlit run app.py                      # run the app (localhost)
+uv run pytest                                    # tests
+uv run pytest -m live                            # live tests (network/Ollama)
+uv lock --upgrade-package yt-dlp && uv sync      # fix "YouTube changed" metadata errors
+uv add <pkg>                                     # add a dependency
 ```
 
 ## Data model
 One note per video (format TBD in spec): frontmatter (title, channel, url, source, date) + summary + transcript.
 
 ## Key patterns
-TBD after spec.
+- app.py is a thin UI layer; all logic lives in pipeline/notes. Current note path is `st.session_state["note"]`; summary failures are kept in `st.session_state["summary_error"]` to avoid retry loops until Regenerate.
+- Status is stored in the note frontmatter (`unreviewed` / `watch` / `skip`).
 
 ## Known quirks
 - No Docker: containers on macOS can't use Metal, so mlx-whisper would fall back to CPU.
@@ -47,4 +60,5 @@ TBD after spec.
 
 ## What's built / backlog
 - [x] Environment
-- [ ] Pipeline + UI (MVP)
+- [x] Pipeline modules + Streamlit UI
+- [ ] End-to-end check with a real link (Task 9)
