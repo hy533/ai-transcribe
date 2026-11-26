@@ -6,24 +6,24 @@ import config
 from fetch import PipelineError, check_node
 from notes import list_recent, parse_note, replace_section, set_status
 from pipeline import Deps, ensure_summary, ensure_transcript, needs_summary
+from transcript import whisper_line
 
 STEP_LINES = {
-    "metadata": "Reading video info…",
+    "metadata": "Reading info…",
     "captions": "Using the video's captions…",
-    "whisper": "Transcribing audio with Whisper…",
     "whisper-download": "First-time Whisper model download (~1.6 GB)…",
 }
 STATUS_MARKS = {"unreviewed": "● ", "watch": "✓ ", "skip": "– "}
-SOURCE_NAMES = {"youtube": "YouTube", "bilibili": "Bilibili"}
+SOURCE_NAMES = {"youtube": "YouTube", "bilibili": "Bilibili", "apple_podcasts": "Apple Podcasts"}
 
 
 def process_link(url: str, force: bool = False):
     """Run ensure_transcript inside an st.status; returns (path, existed) or None on error."""
     with st.status("Working…", expanded=True) as status:
-        def on_step(step: str) -> None:
+        def on_step(step: str, duration: int | None = None) -> None:
             if step == "saved":
                 return
-            st.write(STEP_LINES.get(step, step))
+            st.write(whisper_line(duration) if step == "whisper" else STEP_LINES.get(step, step))
         try:
             path, existed = ensure_transcript(url, config.VAULT_DIR, Deps.real(), on_step, force=force)
         except PipelineError as e:
@@ -141,7 +141,7 @@ def main() -> None:
 
     with st.form("go", clear_on_submit=False):
         box, go = st.columns([8, 1], vertical_alignment="bottom")
-        url = box.text_input("Link", placeholder="Paste a YouTube or Bilibili link",
+        url = box.text_input("Link", placeholder="Paste a YouTube, Bilibili or Apple Podcasts link",
                              label_visibility="collapsed")
         submitted = go.form_submit_button("Go")
     if submitted and url.strip():

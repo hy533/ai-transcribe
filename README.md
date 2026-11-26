@@ -1,6 +1,6 @@
 # AI Transcribe
 
-A personal, local-only tool for deciding whether a YouTube or Bilibili video is worth watching.
+A personal, local-only tool for deciding whether a YouTube or Bilibili video, or an Apple Podcasts episode, is worth your time.
 
 Paste a link and it:
 
@@ -8,7 +8,7 @@ Paste a link and it:
 2. Writes a summary with a local Ollama model. Chinese videos get Chinese summaries, English videos get English ones.
 3. Saves both as one markdown note in an Obsidian vault.
 
-You then read the summary and transcript side by side and mark the video **Watch** or **Skip**. The Obsidian vault is the library; there is no separate database. Nothing leaves your Mac except the requests to YouTube or Bilibili.
+You then read the summary and transcript side by side and mark the video **Watch** or **Skip**. The Obsidian vault is the library; there is no separate database. Nothing leaves your Mac except the requests to YouTube, Bilibili or Apple Podcasts.
 
 ---
 
@@ -51,7 +51,9 @@ This opens the app at http://localhost:8501.
 - **Already processed:** pasting a link you already have opens the existing note, with an "Already in your library" banner. It doesn't download anything again.
 - **Interrupted summary:** if you click away while a summary is being written, the note keeps an empty Summary section. It is generated again the next time you open the note.
 
-Supported links: single YouTube videos and single Bilibili videos. Playlists and channels are rejected with an error.
+Supported links: single YouTube videos, single Bilibili videos, and Apple Podcasts *episode* links (open the episode, then Share → Copy Link; the link contains `?i=`). Playlists, channels and Apple Podcasts show pages are rejected with an error. Spotify isn't supported: its audio is DRM-protected.
+
+Podcast episodes have no captions, so they always go through Whisper. While it runs, the progress line shows the audio length and a rough estimate, e.g. "Transcribing 2:05:00 of audio with Whisper (about 4 min)…".
 
 ## Note format
 
@@ -60,10 +62,10 @@ One file per video, named `<title> [<video_id>].md`:
 ```markdown
 ---
 title: ...
-channel: ...
+channel: ...               # show name for podcasts
 url: https://www.youtube.com/watch?v=...
 video_id: ...
-source: youtube            # or bilibili
+source: youtube            # or bilibili, apple_podcasts
 published: '2026-11-22'
 duration: '13:38'
 processed: '2026-11-26'
@@ -71,7 +73,7 @@ language: en               # transcript language (zh, en, ...)
 transcript_source: captions  # or whisper
 status: unreviewed         # unreviewed | watch | skip
 tags:
-- video
+- video                    # podcast for Apple Podcasts episodes
 ---
 
 ## Summary
@@ -194,6 +196,12 @@ yt-dlp needs `node` on `PATH`. Check with `node --version`. Reinstall with `brew
 - **Audio download fails with HTTP 567 or 403:** Bilibili's CDN refuses one whole-file request. `download_audio` in `fetch.py` downloads in 10 MB pieces (`http_chunk_size`) for this reason; don't remove it.
 - **Subtitles are never used:** Bilibili only shows CC subtitles to logged-in users, so most Bilibili videos go through Whisper. To use them, set `COOKIES_BROWSER = "chrome"` (or `"safari"`, `"firefox"`) in `config.py`; yt-dlp will then read your Bilibili login from that browser. This also unlocks higher-quality formats.
 - **Old videos rejected as playlists:** some old Bilibili uploads come back from yt-dlp as multi-part, and the app rejects them with the playlist message. This is a known limitation.
+
+### Apple Podcasts
+
+- Only episode links work; old `itunes.apple.com` links are rewritten to `podcasts.apple.com` automatically. A show link (no `?i=` in it) gets "That's a show page — open an episode and copy its link."
+- The show name comes from yt-dlp's `series` field and is saved as `channel`. If episode info stops loading, upgrade yt-dlp (above).
+- The summary limit is about 3 hours of Chinese or 4 hours of English audio; longer episodes keep their transcript and show the "too long" error.
 
 ### Ollama / summary problems
 

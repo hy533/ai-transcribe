@@ -63,3 +63,13 @@ def test_write_new_note_refuses_overwrite(tmp_path):
     with pytest.raises(ValueError, match="already exists"):
         write_new_note(tmp_path, meta(), "en", "captions", "t")
     assert p.read_text() == "hand edited"
+
+
+def test_podcast_note_tag(tmp_path):
+    p = write_new_note(tmp_path, meta(source="apple_podcasts"), "en", "whisper", "[00:00] hi")
+    assert parse_note(p).fields["tags"] == ["podcast"]
+
+
+def test_video_note_tag_unchanged(tmp_path):
+    p = write_new_note(tmp_path, meta(), "en", "captions", "[00:00] hi")
+    assert parse_note(p).fields["tags"] == ["video"]

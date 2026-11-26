@@ -69,7 +69,7 @@ class Fake:
 
 def run(tmp_path, fake, force=False):
     steps = []
-    path, existed = ensure_transcript("https://www.youtube.com/watch?v=abc", tmp_path, fake.deps(), steps.append, force)
+    path, existed = ensure_transcript("https://www.youtube.com/watch?v=abc", tmp_path, fake.deps(), lambda step, *_: steps.append(step), force)
     return path, existed, steps
 
 
@@ -120,13 +120,13 @@ def test_metadata_failure_is_pipeline_error(tmp_path):
     with pytest.raises(PipelineError) as e:
         run(tmp_path, Fake(DownloadError("Private video")))
     assert e.value.step == "metadata"
-    assert "Private video" in e.value.message and "uv lock --upgrade-package yt-dlp" in e.value.message
+    assert "Private video" in e.value.message and "uv lock --upgrade-package yt-dlp" in e.value.message and "If the site changed" in e.value.message
 
 
 def test_unsupported_site(tmp_path):
     with pytest.raises(PipelineError) as e:
         run(tmp_path, Fake(info(extractor_key="Vimeo")))
-    assert e.value.step == "metadata" and "YouTube and Bilibili" in e.value.message
+    assert e.value.step == "metadata" and "YouTube, Bilibili and Apple Podcasts" in e.value.message
 
 
 def test_summary_written_and_streamed(tmp_path):
@@ -216,7 +216,7 @@ def test_empty_captions_language_becomes_whisper_language(tmp_path):
 def test_whisper_no_segments_is_error(tmp_path):
     with pytest.raises(PipelineError) as e:
         run(tmp_path, Fake(info(subtitles={}), whisper_result=([], "en")))
-    assert e.value.step == "whisper" and e.value.message == "No speech found in this video."
+    assert e.value.step == "whisper" and e.value.message == "No speech found in this audio."
 
 
 def test_playlist_rejected(tmp_path):
@@ -242,3 +242,17 @@ def test_summary_headings_demoted(tmp_path):
     out = ensure_summary(path, f.deps(), lambda c: None)
     assert "## " not in out and "**Foo**" in out and "**Bar**" in out
     assert set(__import__("notes").split_sections(path.read_text().split("---\n", 2)[2])) == {"Summary", "Transcript"}
+
+
+def test_apple_show_link_rejected_before_metadata(tmp_path):
+    f = Fake(RuntimeError("get_info must not be called"))
+    with pytest.raises(PipelineError, match="That's a show page — open an episode and copy its link."):
+        ensure_transcript("https://podcasts.apple.com/us/podcast/the-daily/id1200361736", tmp_path, f.deps(), lambda *a: None)
+
+
+def test_whisper_step_carries_duration(tmp_path):
+    calls = []
+    f = Fake(info(subtitles={}, duration=1916))
+    ensure_transcript("https://www.youtube.com/watch?v=abc", tmp_path, f.deps(),
+                      lambda step, duration=None: calls.append((step, duration)))
+    assert ("whisper", 1916) in calls

@@ -38,8 +38,11 @@ class Deps:
                    fetch.whisper_cached, fetch.transcribe, summarize.stream_summary)
 
 
-def _whisper(url: str, deps: Deps, on_step: Callable[[str], None]):
-    on_step("whisper" if deps.whisper_cached() else "whisper-download")
+def _whisper(url: str, deps: Deps, on_step: Callable[..., None], duration: int | None):
+    if deps.whisper_cached():
+        on_step("whisper", duration)
+    else:
+        on_step("whisper-download")
     try:
         with tempfile.TemporaryDirectory() as tmp:
             audio = deps.download_audio(url, Path(tmp))
@@ -50,15 +53,18 @@ def _whisper(url: str, deps: Deps, on_step: Callable[[str], None]):
         raise PipelineError("whisper", str(e)) from e
 
 
-def ensure_transcript(url: str, vault: Path, deps: Deps, on_step: Callable[[str], None],
+def ensure_transcript(url: str, vault: Path, deps: Deps, on_step: Callable[..., None],
                       force: bool = False) -> tuple[Path, bool]:
+    url = fetch.normalize_link(url)
+    if fetch.is_apple_show_link(url):
+        raise PipelineError("metadata", "That's a show page — open an episode and copy its link.")
     on_step("metadata")
     try:
         info = deps.get_info(url)
     except PipelineError:
         raise
     except Exception as e:
-        raise PipelineError("metadata", f"{e}. If YouTube changed, run: uv lock --upgrade-package yt-dlp && uv sync") from e
+        raise PipelineError("metadata", f"{e}. If the site changed, run: uv lock --upgrade-package yt-dlp && uv sync") from e
     if info.get("_type") in ("playlist", "multi_video"):
         raise PipelineError("metadata", "Playlists and channels aren't supported — paste a single video link.")
     meta = build_meta(info, url)
@@ -76,10 +82,10 @@ def ensure_transcript(url: str, vault: Path, deps: Deps, on_step: Callable[[str]
             segments = []
         language = normalize_language(track.lang)
     if not segments:
-        segments, language = _whisper(url, deps, on_step)
+        segments, language = _whisper(url, deps, on_step, meta.duration)
         source = "whisper"
         if not segments:
-            raise PipelineError("whisper", "No speech found in this video.")
+            raise PipelineError("whisper", "No speech found in this audio.")
 
     transcript_md = render_transcript(segments)
     if existing:
