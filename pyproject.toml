@@ -8,6 +8,7 @@ dependencies = [
     "requests>=2.34.2",
     "streamlit>=1.67.0",
     "yt-dlp>=2026.11.23",
+    "yt-dlp-ejs>=0.8.0",
 ]
 
 [dependency-groups]

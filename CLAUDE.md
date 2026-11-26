@@ -56,6 +56,10 @@ One note per video (format TBD in spec): frontmatter (title, channel, url, sourc
 ## Known quirks
 - No Docker: containers on macOS can't use Metal, so mlx-whisper would fall back to CPU.
 - Bilibili CC subtitles often require login cookies; fall back to Whisper if unavailable.
+- Bilibili subtitles arrive from yt-dlp as inline `data` (SRT text, no `url`); `CaptionTrack.data` carries it and `fetch_captions` returns it directly.
+- `yt-dlp-ejs` is required for YouTube JS challenges (node solver script); it is a project dependency.
+- Playlists, channels and multi-video links are rejected (single video only).
+- Rolling-line dedupe applies only to auto captions; manual captions stay verbatim.
 - Ollama's default context is short; use the `-64k` model variant for long transcripts.
 
 ## What's built / backlog
