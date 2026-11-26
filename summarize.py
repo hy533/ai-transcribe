@@ -55,11 +55,19 @@ def stream_summary(transcript_text: str, language: str) -> Iterator[str]:
         "keep_alive": "10m",
         "options": {"num_ctx": config.NUM_CTX},
     }
-    resp = requests.post(f"{config.OLLAMA_URL}/api/chat", json=body, stream=True, timeout=(5, None))
-    resp.raise_for_status()
-    for line in resp.iter_lines():
-        if not line:
-            continue
-        chunk = json.loads(line).get("message", {}).get("content", "")
-        if chunk:
-            yield chunk
+    done = False
+    with requests.post(f"{config.OLLAMA_URL}/api/chat", json=body, stream=True, timeout=(5, None)) as resp:
+        resp.raise_for_status()
+        for line in resp.iter_lines():
+            if not line:
+                continue
+            data = json.loads(line)
+            if "error" in data:
+                raise RuntimeError(f"Ollama error: {data['error']}")
+            chunk = data.get("message", {}).get("content", "")
+            if chunk:
+                yield chunk
+            if data.get("done"):
+                done = True
+    if not done:
+        raise RuntimeError("Ollama stream ended without a done chunk")

@@ -1,12 +1,14 @@
 import json
 
+import pytest
+
 import config
 from summarize import build_messages, estimate_tokens, fits_context, strip_think, stream_summary
 
 
 def test_prompt_names_language_and_structure():
     sys_msg = build_messages("你好", "zh")[0]["content"]
-    assert "Simplified Chinese" in sys_msg and "key points" in sys_msg.lower() and "who" in sys_msg.lower()
+    assert "Simplified Chinese" in sys_msg and "key points" in sys_msg.lower() and "Who it's for" in sys_msg
     assert "heading" in sys_msg.lower()
 
 
@@ -39,6 +41,12 @@ def test_stream_summary_request_and_chunks(monkeypatch):
     captured = {}
 
     class FakeResp:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            captured["closed"] = True
+
         def raise_for_status(self):
             captured["checked"] = True
 
@@ -56,9 +64,43 @@ def test_stream_summary_request_and_chunks(monkeypatch):
     assert list(stream_summary("text", "en")) == ["Hel", "lo"]
     body = captured["json"]
     assert captured["url"] == config.OLLAMA_URL + "/api/chat"
-    assert captured["checked"] and captured["stream"] is True
+    assert captured["checked"] and captured["closed"] and captured["stream"] is True
     assert body["model"] == "qwen3.8-27b-64k"
     assert body["stream"] is True and body["think"] is False
     assert body["keep_alive"] == "10m"
     assert body["options"]["num_ctx"] == 65536
     assert body["messages"] == build_messages("text", "en")
+
+
+def _patch_lines(monkeypatch, lines):
+    class FakeResp:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            pass
+
+        def raise_for_status(self):
+            pass
+
+        def iter_lines(self):
+            return iter(lines)
+
+    monkeypatch.setattr("summarize.requests.post", lambda *a, **k: FakeResp())
+
+
+def test_stream_summary_raises_on_midstream_error(monkeypatch):
+    _patch_lines(monkeypatch, [
+        json.dumps({"message": {"content": "Hi"}}).encode(),
+        json.dumps({"error": "runner crashed"}).encode(),
+    ])
+    gen = stream_summary("t", "en")
+    assert next(gen) == "Hi"
+    with pytest.raises(RuntimeError, match="Ollama error: runner crashed"):
+        next(gen)
+
+
+def test_stream_summary_raises_if_no_done(monkeypatch):
+    _patch_lines(monkeypatch, [json.dumps({"message": {"content": "Hi"}}).encode()])
+    with pytest.raises(RuntimeError):
+        list(stream_summary("t", "en"))
