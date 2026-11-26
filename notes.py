@@ -54,7 +54,7 @@ def render_note(meta: VideoMeta, language: str, transcript_source: str, transcri
         "language": language,
         "transcript_source": transcript_source,
         "status": "unreviewed",
-        "tags": ["video"],
+        "tags": ["podcast"] if meta.source == "apple_podcasts" else ["video"],
     }
     front = yaml.safe_dump(fields, allow_unicode=True, sort_keys=False)
     return f"---\n{front}---\n\n## Summary\n\n{summary}\n\n## Transcript\n\n{transcript_md}\n"

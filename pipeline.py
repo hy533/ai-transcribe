@@ -52,6 +52,8 @@ def _whisper(url: str, deps: Deps, on_step: Callable[[str], None]):
 
 def ensure_transcript(url: str, vault: Path, deps: Deps, on_step: Callable[[str], None],
                       force: bool = False) -> tuple[Path, bool]:
+    if fetch.is_apple_show_link(url):
+        raise PipelineError("metadata", "That's a show page — open an episode and copy its link.")
     on_step("metadata")
     try:
         info = deps.get_info(url)

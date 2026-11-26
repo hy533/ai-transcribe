@@ -126,7 +126,7 @@ def test_metadata_failure_is_pipeline_error(tmp_path):
 def test_unsupported_site(tmp_path):
     with pytest.raises(PipelineError) as e:
         run(tmp_path, Fake(info(extractor_key="Vimeo")))
-    assert e.value.step == "metadata" and "YouTube and Bilibili" in e.value.message
+    assert e.value.step == "metadata" and "YouTube, Bilibili and Apple Podcasts" in e.value.message
 
 
 def test_summary_written_and_streamed(tmp_path):
@@ -242,3 +242,9 @@ def test_summary_headings_demoted(tmp_path):
     out = ensure_summary(path, f.deps(), lambda c: None)
     assert "## " not in out and "**Foo**" in out and "**Bar**" in out
     assert set(__import__("notes").split_sections(path.read_text().split("---\n", 2)[2])) == {"Summary", "Transcript"}
+
+
+def test_apple_show_link_rejected_before_metadata(tmp_path):
+    f = Fake(RuntimeError("get_info must not be called"))
+    with pytest.raises(PipelineError, match="That's a show page — open an episode and copy its link."):
+        ensure_transcript("https://podcasts.apple.com/us/podcast/the-daily/id1200361736", tmp_path, f.deps(), lambda *a: None)

@@ -40,7 +40,14 @@ def source_of(info: dict) -> str:
         return "youtube"
     if "bili" in key:
         return "bilibili"
-    raise PipelineError("metadata", "Only YouTube and Bilibili links are supported.")
+    if "applepodcasts" in key:
+        return "apple_podcasts"
+    raise PipelineError("metadata", "Only YouTube, Bilibili and Apple Podcasts links are supported.")
+
+
+def is_apple_show_link(url: str) -> bool:
+    parsed = urlparse(url)
+    return parsed.hostname == "podcasts.apple.com" and "i" not in parse_qs(parsed.query)
 
 
 def video_key(info: dict, url: str) -> str:
@@ -59,7 +66,7 @@ def build_meta(info: dict, url: str) -> VideoMeta:
     return VideoMeta(
         video_id=video_key(info, url),
         title=info.get("title") or "",
-        channel=info.get("channel") or info.get("uploader") or "",
+        channel=info.get("channel") or info.get("uploader") or info.get("series") or "",
         url=info.get("webpage_url") or url,
         source=source_of(info),
         published=published,

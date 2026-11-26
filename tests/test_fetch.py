@@ -3,7 +3,7 @@ import shutil
 import pytest
 
 import config
-from fetch import PipelineError, build_meta, check_node, source_of, video_key, ydl_opts
+from fetch import PipelineError, build_meta, check_node, is_apple_show_link, source_of, video_key, ydl_opts
 
 
 def test_ydl_opts_uses_node():
@@ -81,3 +81,26 @@ def test_download_audio_uses_range_chunks(monkeypatch, tmp_path):
     monkeypatch.setattr(yt_dlp, "YoutubeDL", FakeYDL)
     download_audio("u", tmp_path)
     assert seen["http_chunk_size"] == 10 * 1024 * 1024
+
+
+def test_source_of_apple_podcasts():
+    assert source_of({"extractor_key": "ApplePodcasts"}) == "apple_podcasts"
+
+
+def test_source_of_unsupported_message():
+    with pytest.raises(PipelineError, match="Only YouTube, Bilibili and Apple Podcasts links are supported."):
+        source_of({"extractor_key": "Vimeo"})
+
+
+def test_build_meta_uses_series_as_channel():
+    m = build_meta({"extractor_key": "ApplePodcasts", "id": "1000804177272", "title": "Ep",
+                    "series": "The Daily", "duration": 1916, "upload_date": "20261126"},
+                   "https://podcasts.apple.com/us/podcast/x/id1200361736?i=1000804177272")
+    assert (m.channel, m.source, m.video_id) == ("The Daily", "apple_podcasts", "1000804177272")
+
+
+def test_apple_show_link_detection():
+    assert is_apple_show_link("https://podcasts.apple.com/us/podcast/the-daily/id1200361736")
+    assert not is_apple_show_link("https://podcasts.apple.com/us/podcast/x/id1200361736?i=1000804177272&uo=4")
+    assert not is_apple_show_link("https://podcasts.apple.com/cn/podcast/x/id1?i=2")
+    assert not is_apple_show_link("https://www.youtube.com/watch?v=abc")
