@@ -154,6 +154,39 @@ Manual E2E: one captioned YouTube video, one uncaptioned video (Whisper), one Ch
 | summary | transcript > 64k | error, note saved | unit | clear error |
 | UI | click mid-run | D1 checkpoint/resume | unit | summary resumes |
 
+## Design review decisions (2026-11-26)
+Supersedes the UI sketch above where they differ. Streamlit default theme; no custom CSS beyond column heights.
+
+### Layout (D2 header bar, D3 2:3 columns)
+```
+┌ sidebar ──────────┬ main ───────────────────────────────────────────────┐
+│ Library (30 most  │ [ Paste a YouTube or Bilibili link        ] [Go]    │  ← st.form, Enter submits
+│ recent, newest    ├─────────────────────────────────────────────────────┤
+│ first)            │ Title (links to video)                      ⋯ menu  │  ← ⋯ = Regenerate summary,
+│ ● unreviewed      │ channel · 42:10 · YouTube · captions                │       Reprocess video
+│ ✓ watch           │ [ Watch ] [ Skip ]   status: unreviewed             │
+│ – skip            ├──────────────────┬──────────────────────────────────┤
+│ (title, 1 line,   │ SUMMARY  (2)     │ TRANSCRIPT  (3)                  │
+│  truncated …)     │ overview         │ [00:00] …                        │
+│                   │ • key points     │ [00:42] …   (own scroll,         │
+│                   │ For: …           │             fixed height)        │
+└───────────────────┴──────────────────┴──────────────────────────────────┘
+```
+Hierarchy: 1) link box, 2) title + Watch/Skip, 3) summary, 4) transcript, 5) library. The active status button is shown as primary (filled). Long titles wrap in the header and truncate with … in the sidebar.
+
+### States
+| Feature | Loading | Empty | Error | Success | Partial |
+|---|---|---|---|---|---|
+| Main area | `st.status` with checklist: metadata → captions/Whisper (with D7 first-download note) → saved → summary | First launch / nothing selected: one line "Paste a link to get its transcript and summary." | Red `st.error` naming the step + plain fix (e.g. "Ollama isn't running — start it, then Regenerate"). Link stays in the box for retry. | Status collapses to "Saved → <filename>" | Transcript shown, summary column says "Summary failed — Regenerate" |
+| Summary | Streams text live (D6) | — | see Partial | rendered markdown | auto-resumes when note opened with empty summary (D1) |
+| Already-seen link | — | — | — | Info banner: "Already in your library (processed <date>)" + note loads instantly | — |
+| Library sidebar | — | "No videos yet." | Vault folder missing → error with the path | list | — |
+| Watch/Skip | — | — | write fails → toast error | `st.toast("Marked as watch")` | — |
+| Reprocess | confirm dialog first ("Replaces transcript and summary; keeps your status and notes") | — | as Main | as Main | — |
+
+### NOT in scope (design)
+- Custom theme/fonts, mobile layout (localhost on the Mac only), sidebar search/filter (Obsidian search covers it), transcript click-to-seek.
+
 ## GSTACK REVIEW REPORT
 
 | Review | Trigger | Why | Runs | Status | Findings |
@@ -161,8 +194,8 @@ Manual E2E: one captioned YouTube video, one uncaptioned video (Whisper), one Ch
 | CEO Review | `/plan-ceo-review` | Scope & strategy | 0 | — | — |
 | Codex Review | `/codex review` | Independent 2nd opinion | 0 | — | — |
 | Eng Review | `/plan-eng-review` | Architecture & tests (required) | 1 | CLEAR | 7 issues, 0 critical gaps |
-| Design Review | `/plan-design-review` | UI/UX gaps | 0 | — | — |
+| Design Review | `/plan-design-review` | UI/UX gaps | 1 | CLEAR | score: 5/10 → 9/10, 3 decisions |
 | DX Review | `/plan-devex-review` | Developer experience gaps | 0 | — | — |
 
 - **UNRESOLVED:** 0
-- **VERDICT:** ENG CLEARED — design review next.
+- **VERDICT:** ENG + DESIGN CLEARED — ready for implementation plan.
