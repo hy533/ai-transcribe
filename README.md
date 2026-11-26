@@ -218,6 +218,19 @@ uv lock --upgrade && uv sync     # upgrade everything (then run the tests)
 
 After any upgrade, run `uv run pytest`, then process one captioned YouTube video and one Bilibili video in the app.
 
+### Command line (`cli.py`)
+
+- **The output is a contract.** Agents and n8n workflows parse it, so treat the JSON keys of `transcribe` / `list` / `status`, the exit codes, and "only results on stdout" as a public interface. Add keys freely; renaming or removing one breaks callers. `tests/test_cli.py` pins the current shape: update it deliberately, never just to make it pass.
+- **Never print to stdout from pipeline code.** Progress belongs in `on_step` (the CLI sends it to stderr). A stray `print` in `pipeline.py` or `fetch.py` corrupts the JSON a caller reads. yt-dlp's own output is kept quiet by `quiet`/`no_warnings` in `ydl_opts`; keep it that way.
+- **One Whisper run at a time.** Nothing stops two `transcribe` calls running together; they would compete with Ollama for GPU memory. Run workflow items one after another (in n8n: batch size 1).
+- **Timeouts:** long episodes keep Whisper busy for minutes (about 1 min per 35 min of audio). Callers need a long timeout; a killed run leaves no partial note (the note is written only after the transcript exists).
+- **Quick check after changes:**
+  ```bash
+  uv run pytest tests/test_cli.py
+  uv run python cli.py list --limit 1
+  ```
+- **MCP server / HTTP service** are not built on purpose. If Muse or n8n needs one later, make it a thin wrapper over the same functions `cli.py` calls (`ensure_transcript`, `ensure_summary`, `parse_note`, `list_recent`, `set_status`), with the same output shape.
+
 ### Known quirks
 
 - In Chinese summaries the "Key points" and "Who it's for" labels stay in English, and the model sometimes leaves out "Who it's for".

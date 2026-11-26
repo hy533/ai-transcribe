@@ -81,3 +81,4 @@ def test_download_audio_uses_range_chunks(monkeypatch, tmp_path):
     monkeypatch.setattr(yt_dlp, "YoutubeDL", FakeYDL)
     download_audio("u", tmp_path)
     assert seen["http_chunk_size"] == 10 * 1024 * 1024
+    assert seen["noprogress"] is True  # progress bars on stdout would corrupt cli.py JSON
