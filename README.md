@@ -44,10 +44,12 @@ This opens the app at http://localhost:8501.
 
 - **Paste a link** and press Go. A progress box shows each step: reading video info, then captions or Whisper, then saving. The note is saved as soon as the transcript exists, and the summary streams in afterwards.
 - **Library (sidebar):** your 30 most recent notes. The mark before each title is its status: `●` unreviewed, `✓` watch, `–` skip. Click a title to open it.
+- **Summary / Detailed tabs:** the Summary tab is the short triage summary. The Detailed tab has a **Write detailed summary** button: it writes a longer summary that follows the video in order (the plot, or each argument with its evidence) and keeps names, numbers, dates and conclusions, ending with **Takeaways**. It takes about 20–60 seconds and is saved in the note as `## Detailed summary`, next to the short one. If you click away before it finishes, nothing is saved.
 - **Watch / Skip:** changes only the `status:` line in the note's frontmatter.
 - **⋯ menu:**
   - *Regenerate summary* clears the summary and writes a new one.
-  - *Reprocess video* fetches the transcript again (asks first). It keeps your status and any sections you added in Obsidian.
+  - *Regenerate detailed summary* (only once one exists) rewrites the detailed summary; the short one is untouched.
+  - *Reprocess video* fetches the transcript again (asks first). It keeps your status and any sections you added in Obsidian, and clears the detailed summary since it described the old transcript.
 - **Already processed:** pasting a link you already have opens the existing note, with an "Already in your library" banner. It doesn't download anything again.
 - **Interrupted summary:** if you click away while a summary is being written, the note keeps an empty Summary section. It is generated again the next time you open the note.
 
@@ -79,6 +81,10 @@ tags:
 ## Summary
 
 A short paragraph, then **Key points** bullets, then **Who it's for:**.
+
+## Detailed summary
+
+Only present after you click Write detailed summary.
 
 ## Transcript
 [00:12] One line per ~30 seconds of speech...

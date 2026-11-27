@@ -56,6 +56,7 @@ One note per video (format TBD in spec): frontmatter (title, channel, url, sourc
 ## Key patterns
 - app.py is a thin UI layer; all logic lives in pipeline/notes. Current note path is `st.session_state["note"]`; summary failures are kept in `st.session_state["summary_error"]` to avoid retry loops until Regenerate.
 - cli.py is a thin front end like app.py: stdout is only the result (JSON / plain text), progress + errors go to stderr; exit 1 on failure. MCP server and HTTP service are deliberately not built yet (CLI first; add only when Muse/n8n need them).
+- Detailed summary: on demand only (`ensure_detailed_summary`, `stream_summary(..., detailed=True)`); written to `## Detailed summary` between Summary and Transcript only after the stream completes; `needs_summary` ignores it; Reprocess clears it if present.
 - Status is stored in the note frontmatter (`unreviewed` / `watch` / `skip`).
 - Never keep downloaded media: audio goes to a `TemporaryDirectory` and is deleted right after transcription (before the Watch/Skip decision). Only the markdown note persists.
 

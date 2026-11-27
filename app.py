@@ -5,7 +5,7 @@ import streamlit as st
 import config
 from fetch import PipelineError, check_node
 from notes import list_recent, parse_note, replace_section, set_status
-from pipeline import Deps, ensure_summary, ensure_transcript, needs_summary
+from pipeline import Deps, ensure_detailed_summary, ensure_summary, ensure_transcript, needs_summary
 from transcript import whisper_line
 
 STEP_LINES = {
@@ -49,6 +49,7 @@ def render_sidebar() -> None:
 
 def reset_note_state(path: Path) -> None:
     st.session_state.setdefault("summary_error", {}).pop(str(path), None)
+    st.session_state.setdefault("detailed_error", {}).pop(str(path), None)
 
 
 @st.dialog("Reprocess video")
@@ -75,6 +76,10 @@ def render_header(path: Path, note) -> None:
             else:
                 reset_note_state(path)
                 st.rerun()
+        if note.detailed and st.button("Regenerate detailed summary", key="regenerate-detailed"):
+            st.session_state.setdefault("detailed_error", {}).pop(str(path), None)
+            st.session_state["detailed_run"] = str(path)
+            st.rerun()
         if st.button("Reprocess video", key="reprocess"):
             reprocess_dialog(str(fields.get("url")))
     source = SOURCE_NAMES.get(str(fields.get("source")), str(fields.get("source")))
@@ -104,28 +109,67 @@ def render_columns(path: Path, note) -> None:
         with st.container(height=650):
             st.text(note.transcript)
     with summary_col:
-        st.subheader("Summary")
-        if str(path) in errors:
-            st.warning("Summary failed — use ⋯ → Regenerate")
-            st.error(errors[str(path)])
-        elif needs_summary(path):
-            placeholder = st.empty()
-            buffer = ""
+        short_tab, detailed_tab = st.tabs(["Summary", "Detailed"])
+        with detailed_tab:
+            render_detailed(path, note)
+        with short_tab:
+            render_short(path, note, errors)
 
-            def on_chunk(chunk: str) -> None:
-                nonlocal buffer
-                buffer += chunk
-                placeholder.markdown(buffer)
-            try:
-                ensure_summary(path, Deps.real(), on_chunk)
-            except PipelineError as e:
-                errors[str(path)] = f"{e.step}: {e.message}"
-            else:
-                if needs_summary(path):
-                    errors[str(path)] = "summary: The model returned an empty summary — use ⋯ → Regenerate."
-            st.rerun()
+
+def stream_to_placeholder():
+    """Return (placeholder, on_chunk) that renders streamed markdown as it arrives."""
+    placeholder = st.empty()
+    buffer = ""
+
+    def on_chunk(chunk: str) -> None:
+        nonlocal buffer
+        buffer += chunk
+        placeholder.markdown(buffer)
+    return placeholder, on_chunk
+
+
+def render_detailed(path: Path, note) -> None:
+    errors = st.session_state.setdefault("detailed_error", {})
+    requested = st.session_state.get("detailed_run") == str(path)
+    if str(path) in errors:
+        st.error(errors[str(path)])
+    if not requested and note.detailed:
+        st.markdown(note.detailed)
+        return
+    if not requested:
+        prompt = st.empty()
+        with prompt.container():
+            st.caption("Follows the video in order and keeps names, numbers and the plot.")
+            requested = st.button("Write detailed summary", key="write-detailed")
+        if requested:
+            prompt.empty()
+    if requested:
+        st.session_state.pop("detailed_run", None)
+        errors.pop(str(path), None)
+        _, on_chunk = stream_to_placeholder()
+        try:
+            ensure_detailed_summary(path, Deps.real(), on_chunk)
+        except PipelineError as e:
+            errors[str(path)] = f"{e.step}: {e.message}"
+        st.rerun()
+
+
+def render_short(path: Path, note, errors: dict) -> None:
+    if str(path) in errors:
+        st.warning("Summary failed — use ⋯ → Regenerate")
+        st.error(errors[str(path)])
+    elif needs_summary(path):
+        _, on_chunk = stream_to_placeholder()
+        try:
+            ensure_summary(path, Deps.real(), on_chunk)
+        except PipelineError as e:
+            errors[str(path)] = f"{e.step}: {e.message}"
         else:
-            st.markdown(note.summary)
+            if needs_summary(path):
+                errors[str(path)] = "summary: The model returned an empty summary — use ⋯ → Regenerate."
+        st.rerun()
+    else:
+        st.markdown(note.summary)
 
 
 def main() -> None:

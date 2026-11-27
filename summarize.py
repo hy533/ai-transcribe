@@ -29,6 +29,7 @@ def build_messages(transcript_text: str, language: str, detailed: bool = False) 
             "happens, who is involved, and how it turns and ends. For a talk or explainer, give each argument or "
             "step with its evidence.\n"
             "3. A line `**Takeaways**` followed by 3-6 bullet points.\n"
+            "The numbers 1-3 above only describe the structure; do not number these parts in your output.\n"
             "Keep concrete details: names, numbers, dates, places, prices, results, and the speaker's actual "
             "conclusions. Use short quotes only when the exact words matter.\n"
             "Do not use markdown headings (no lines starting with #); use only bold labels.\n"

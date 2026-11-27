@@ -21,3 +21,11 @@ def test_live_chinese_summary_is_chinese():
 def test_live_english_summary_is_english():
     out = strip_think("".join(stream_summary(EN_SAMPLE, "en")))
     assert cjk_ratio(out) < 0.02
+
+
+@pytest.mark.parametrize("sample,lang", [(EN_SAMPLE, "en"), (ZH_SAMPLE, "zh")])
+def test_live_detailed_summary(sample, lang):
+    out = strip_think("".join(stream_summary(sample, lang, detailed=True)))
+    assert "**Takeaways**" in out
+    assert not any(line.lstrip().startswith("#") for line in out.splitlines())
+    assert (cjk_ratio(out) > 0.3) if lang == "zh" else (cjk_ratio(out) < 0.02)
