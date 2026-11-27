@@ -328,3 +328,11 @@ def test_reprocess_without_detailed_adds_no_section(tmp_path):
     path = _note_with_summary(tmp_path)
     run(tmp_path, Fake(), force=True)
     assert "## Detailed summary" not in path.read_text()
+
+
+def test_reprocess_ignores_similar_user_heading(tmp_path):
+    path = _note_with_summary(tmp_path)
+    path.write_text(path.read_text() + "\n## Detailed summary ideas\nmine\n")
+    run(tmp_path, Fake(), force=True)
+    text = path.read_text()
+    assert "\n## Detailed summary\n" not in text and "## Detailed summary ideas\nmine" in text

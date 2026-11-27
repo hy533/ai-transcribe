@@ -91,7 +91,7 @@ def ensure_transcript(url: str, vault: Path, deps: Deps, on_step: Callable[..., 
     if existing:
         replace_section(existing, "Transcript", transcript_md)
         replace_section(existing, "Summary", "")
-        if "\n## Detailed summary" in existing.read_text(encoding="utf-8"):
+        if re.search(r"^## Detailed summary[ \t]*$", existing.read_text(encoding="utf-8"), re.MULTILINE):
             replace_section(existing, "Detailed summary", "")
         set_field(existing, "language", language)
         set_field(existing, "transcript_source", source)
